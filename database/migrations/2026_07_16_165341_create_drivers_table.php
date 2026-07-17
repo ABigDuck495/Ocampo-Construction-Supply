@@ -11,13 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('users', function (Blueprint $table) {
-            $table->id('UserID');
+        Schema::create('drivers', function (Blueprint $table) {
+            $table->id('DriverID');
             $table->string('Name');
-            $table->string('Password');
-            $table->enum('Role', ['Admin', 'Staff'])->default('Staff');
-            $table->string('Email')->unique();
             $table->string('PhoneNumber')->nullable();
+            $table->timestamps();
         });
     }
 
@@ -26,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('users');
+        Schema::dropIfExists('drivers');
     }
 };
