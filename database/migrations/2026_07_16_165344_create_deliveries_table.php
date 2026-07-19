@@ -14,15 +14,11 @@ return new class extends Migration
         Schema::create('deliveries', function (Blueprint $table) {
             $table->id('DeliveryID');
             $table->unsignedBigInteger('DispatchID');
-            $table->unsignedBigInteger('TruckID')->nullable();
-            $table->unsignedBigInteger('DriverID')->nullable();
             $table->timestamp('DeliveryDate')->nullable();
             $table->integer('QuantityDelivered')->default(1);
             $table->enum('Status', ['Cancelled', 'Delivered'])->default('Delivered');
             $table->string('Notes')->nullable();
             $table->foreign('DispatchID')->references('DispatchID')->on('dispatch')->onDelete('cascade');
-            $table->foreign('TruckID')->references('TruckID')->on('trucks')->onDelete('set null');
-            $table->foreign('DriverID')->references('DriverID')->on('drivers')->onDelete('set null');
             $table->timestamps();
         });
     }
