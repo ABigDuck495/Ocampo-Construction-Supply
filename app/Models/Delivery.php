@@ -15,4 +15,9 @@ class Delivery extends Model
         'Status',
         'Notes',
     ];
+    protected $guarded = ['DeliveryID'];
+    public function dispatch()
+    {
+        return $this->belongsTo(Dispatch::class, 'DispatchID', 'DispatchID');
+    }
 }

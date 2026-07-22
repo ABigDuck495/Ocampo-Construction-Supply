@@ -13,4 +13,9 @@ class Inventory extends Model
         'QuantityOnHand',
         'ReorderLevel',
     ];
+    protected $guarded = ['InventoryID'];
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'ProductID', 'ProductID');
+    }
 }

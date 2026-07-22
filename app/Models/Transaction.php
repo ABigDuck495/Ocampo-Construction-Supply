@@ -15,4 +15,17 @@ class Transaction extends Model
         'PaymentMethod',
         'TotalPrice',
     ];
+    protected $guarded = ['TransactionID'];
+    public function order(){
+        return $this->belongsTo(Order::class, 'OrderID', 'OrderID');
+    }
+    public function products(){
+        return $this->hasManyThrough(Product::class, OrderItem::class, 'OrderID', 'ProductID', 'OrderID', 'ProductID');
+    }
+    public function orderItems(){
+        return $this->hasManyThrough(OrderItem::class, Order::class, 'OrderID', 'OrderID', 'OrderID', 'OrderID');
+    }
+    public function inventory(){
+        return $this->hasManyThrough(Inventory::class, Product::class, 'ProductID', 'ProductID', 'ProductID', 'ProductID');
+    }
 }

@@ -10,6 +10,11 @@ class User extends Model
     protected $primaryKey = 'UserID';
     protected $fillable = ['Name', 'Password', 'Role', 'Email', 'PhoneNumber'];
 
+    protected $guarded = ['UserID'];
+
+    public function orders(){
+        return $this->hasMany(Order::class, 'CreatedBy', 'UserID');
+    }
     public function setPasswordAttribute($value) {
         $this->attributes['Password'] = bcrypt($value);
     }

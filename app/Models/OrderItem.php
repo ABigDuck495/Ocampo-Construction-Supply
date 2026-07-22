@@ -14,4 +14,23 @@ class OrderItem extends Model
         'Quantity',
         'Status',
     ];
+    protected $guarded = ['OrderItemID'];
+
+    public function order(){
+        return $this->belongsTo(Order::class, 'OrderID', 'OrderID');
+    }
+    public function product(){
+        return $this->belongsTo(Product::class, 'ProductID', 'ProductID');
+    }
+    public function dispatches(){
+        return $this->hasMany(Dispatch::class, 'OrderItemID', 'OrderItemID');
+    }
+    public function deliveries(){
+        return $this->hasOneThrough(Delivery::class, Dispatch::class, 'OrderItemID', 'DispatchID', 'OrderItemID', 'DispatchID');
+    }
+    public function inventory(){
+        return $this->hasOne(Inventory::class, 'ProductID', 'ProductID');
+    }
+
+
 }
