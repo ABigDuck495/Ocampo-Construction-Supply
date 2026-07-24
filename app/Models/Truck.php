@@ -18,8 +18,14 @@ class Truck extends Model
     public function dispatches(){
         return $this->hasMany(Dispatch::class, 'TruckID', 'TruckID');
     }
-    public function drivers(){
-        return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'TruckID', 'DriverID')->withPivot('Role');
+    // public function drivers(){
+    //     return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'TruckID', 'DriverID')->withPivot('Role');
+    // }
+    public function scopeAvailable(){
+        return $this->Status === 'Available';
+    }
+    public function isAvailable(){
+        return $this->Status === 'Available';
     }
 
 }

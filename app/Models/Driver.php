@@ -14,17 +14,18 @@ class Driver extends Model
     ];
     protected $guarded = ['DriverID'];
     
-    public function dispatches(){
-    return $this->belongsToMany(Dispatch::class, 'dispatch_drivers', 'DriverID', 'DispatchID')
-                ->withPivot('Role')
-                ->withTimestamps();
+    public function dispatches() {
+        return $this->belongsToMany(Dispatch::class, 'dispatch_drivers', 'DriverID', 'DispatchID')
+                    ->withPivot('Role');
     }
-    public function deliveries()
-    {
-        return $this->hasManyThrough(Delivery::class, Dispatch::class, 'DispatchID', 'DispatchID', 'DriverID', 'DispatchID');
+    public function dispatchDrivers(){
+        return $this->hasMany(DispatchDriver::class, 'DriverID', 'DriverID');
     }
-    public function getDeliveriesCountAttribute()
-    {
+    public function activeDispatches(){
+        return $this->dispacthes()->wherePivot('Role', 'Main')
+                    ->where('Status', 'On Route');
+    }
+    public function getDeliveriesCountAttribute(){
         return $this->deliveries()->count();
     }
 

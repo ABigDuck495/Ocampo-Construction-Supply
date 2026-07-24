@@ -9,6 +9,7 @@ class User extends Model
     protected $table = 'users';
     protected $primaryKey = 'UserID';
     protected $fillable = ['Name', 'Password', 'Role', 'Email', 'PhoneNumber'];
+    protected $hidden = ['Password'];
 
     protected $guarded = ['UserID'];
 
@@ -23,10 +24,10 @@ class User extends Model
         $this->save();
     }
 
-    public function isAdmin() {
+    public function scopeAdmins() {
         return $this->Role === 'Admin';
     }
-    public function isStaff() {
+    public function scopeStaffs() {
         return $this->Role === 'Staff';
     }
 }

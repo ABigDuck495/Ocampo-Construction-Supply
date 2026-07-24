@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('DispatchID');
             $table->unsignedBigInteger('DriverID');
             $table->enum('Role', ['Driver', 'Helper'])->default('Driver');
-            $table->foreign('DispatchID')->references('DispatchID')->on('dispatch')->onDelete('cascade');
+            $table->foreign('DispatchID')->references('DispatchID')->on('dispatches')->onDelete('cascade');
             $table->foreign('DriverID')->references('DriverID')->on('drivers')->onDelete('cascade');
             $table->timestamps();
         });

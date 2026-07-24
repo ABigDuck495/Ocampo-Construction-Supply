@@ -16,9 +16,9 @@ return new class extends Migration
             $table->unsignedBigInteger('DispatchID');
             $table->timestamp('DeliveryDate')->nullable();
             $table->integer('QuantityDelivered')->default(1);
-            $table->enum('Status', ['Cancelled', 'Delivered'])->default('Delivered');
+            $table->enum('Status', ['Failed', 'Delivered'])->default('Delivered');
             $table->string('Notes')->nullable();
-            $table->foreign('DispatchID')->references('DispatchID')->on('dispatch')->onDelete('cascade');
+            $table->foreign('DispatchID')->references('DispatchID')->on('dispatches')->onDelete('cascade');
             $table->timestamps();
         });
     }

@@ -16,8 +16,13 @@ class Delivery extends Model
         'Notes',
     ];
     protected $guarded = ['DeliveryID'];
-    public function dispatch()
-    {
+    public function dispatch(){
         return $this->belongsTo(Dispatch::class, 'DispatchID', 'DispatchID');
+    }
+    public function scopeDelivered($query){
+        return $query->where('Status', 'Delivered');
+    }
+    public function scopeFailed($query){
+        return $query->where('Status', 'Failed');
     }
 }

@@ -20,15 +20,26 @@ class Dispatch extends Model
     {
         return $this->belongsTo(OrderItem::class, 'OrderItemID', 'OrderItemID');
     }
-    public function deliveries(){
+    public function delivery(){
         return $this->hasOne(Delivery::class, 'DispatchID', 'DispatchID');
     }
     public function truck()
     {
         return $this->belongsTo(Truck::class, 'TruckID', 'TruckID');
     }
-    public function driver(){
+    public function drivers(){
         return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'DispatchID', 'DriverID')->withPivot('Role');
     }
-
+    public function mainDriver(){
+        return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'DispatchID', 'DriverID')->wherePivot('Role', 'Main Driver');
+    }
+    public function scopeOnRoute($query){
+        return $query->where('Status', 'On Route');
+    }
+    public function scopeCompleted($query){
+        return $query->where('Status', 'Delivered');
+    }
+    public function mainDriverName(){
+        return $this->mainDriver()->first()?->Name;
+    }
 }
