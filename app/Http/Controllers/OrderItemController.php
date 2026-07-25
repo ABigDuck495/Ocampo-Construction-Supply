@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OrderItem;
 use Illuminate\Http\Request;
 
 class OrderItemController extends Controller
@@ -60,5 +61,22 @@ class OrderItemController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+
+    public function remaining(OrderItem $orderItem)
+    {
+        return [
+            'ordered' => $orderItem->Quantity,
+            'dispatched' => $orderItem->quantityDispatched(),
+            'remaining' => $orderItem->quantityRemaining(),
+        ];
+    }
+
+    // Update fulfillment status for a specific line item
+    public function updateStatus(Request $request, OrderItem $orderItem)
+    {
+        $request->validate(['Status' => 'required|in:Pending,Partially Fulfilled,Fulfilled']);
+        $orderItem->update(['Status' => $request->Status]);
+        return $orderItem;
     }
 }

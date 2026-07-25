@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
@@ -60,5 +61,15 @@ class UserController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+    public function activity(Request $request, User $user){
+        return [
+            'orders_created' => $user->orders()
+                ->when($request->date, fn($q) => $q->whereDate('Order_Date', $request->date))
+                ->count(),
+            'transactions_processed' => $user->transactions()
+                ->when($request->date, fn($q) => $q->whereDate('TransactionDate', $request->date))
+                ->count(),
+        ];
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OrderItem;
+use App\Models\Product;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -60,5 +62,25 @@ class ProductController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+    public function search(Request $request){
+        return Product::where('Product_Name', 'like', '%' . $request->q . '%')
+            ->with('inventory')
+            ->limit(20)
+            ->get();
+    }
+
+    public function topSelling(Request $request){
+        return OrderItem::query()
+            ->whereHas('order', fn($q) => $q
+                ->when($request->start, fn($q2) => $q2->whereDate('Order_Date', '>=', $request->start))
+                ->when($request->end, fn($q2) => $q2->whereDate('Order_Date', '<=', $request->end))
+            )
+            ->selectRaw('ProductID, SUM(Quantity) as total_sold')
+            ->groupBy('ProductID')
+            ->orderByDesc('total_sold')
+            ->with('product')
+            ->limit(10)
+            ->get();
     }
 }

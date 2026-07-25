@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Truck;
 use Illuminate\Http\Request;
 
 class TruckController extends Controller
@@ -60,5 +61,15 @@ class TruckController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+    public function available(){
+        return Truck::available()->get();
+    }
+
+    public function utilization(Request $request, Truck $truck){
+        return $truck->dispatches()
+            ->when($request->start, fn($q) => $q->whereDate('DispatchDate', '>=', $request->start))
+            ->when($request->end, fn($q) => $q->whereDate('DispatchDate', '<=', $request->end))
+            ->count();
     }
 }

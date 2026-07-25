@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\GenerateDailyReportJob;
+use App\Models\Report;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -60,5 +62,19 @@ class ReportController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+    public function generateNow(){
+        return app(GenerateDailyReportJob::class)->handle();
+    }
+
+    public function forDate(Request $request){
+        return Report::forDate($request->date ?? today())->firstOrFail();
+    }
+
+    public function trend(Request $request){
+        return Report::query()
+            ->whereBetween('ReportDate', [$request->start, $request->end])
+            ->orderBy('ReportDate')
+            ->get(['ReportDate', 'TotalSales', 'TotalOrders', 'TotalDeliveries']);
     }
 }
