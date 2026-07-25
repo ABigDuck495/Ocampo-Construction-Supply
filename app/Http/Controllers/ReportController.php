@@ -13,7 +13,7 @@ class ReportController extends Controller
      */
     public function index()
     {
-        //
+        return Report::query()->latest('ReportDate')->get();
     }
 
     /**
@@ -21,7 +21,7 @@ class ReportController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create report endpoint.'], 200);
     }
 
     /**
@@ -29,7 +29,18 @@ class ReportController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'ReportDate' => 'required|date',
+            'GeneratedAt' => 'nullable|date',
+            'TotalOrders' => 'nullable|integer',
+            'TotalSales' => 'nullable|numeric',
+            'TotalItemsSold' => 'nullable|integer',
+            'TotalDeliveries' => 'nullable|integer',
+            'TotalDispatches' => 'nullable|integer',
+            'Notes' => 'nullable|string',
+        ]);
+
+        return Report::create($validated);
     }
 
     /**
@@ -37,7 +48,7 @@ class ReportController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return Report::findOrFail($id);
     }
 
     /**
@@ -45,7 +56,7 @@ class ReportController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return Report::findOrFail($id);
     }
 
     /**
@@ -53,7 +64,22 @@ class ReportController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'ReportDate' => 'sometimes|required|date',
+            'GeneratedAt' => 'nullable|date',
+            'TotalOrders' => 'nullable|integer',
+            'TotalSales' => 'nullable|numeric',
+            'TotalItemsSold' => 'nullable|integer',
+            'TotalDeliveries' => 'nullable|integer',
+            'TotalDispatches' => 'nullable|integer',
+            'Notes' => 'nullable|string',
+        ]);
+
+        $report = Report::findOrFail($id);
+        $report->fill($validated);
+        $report->save();
+
+        return $report;
     }
 
     /**
@@ -61,7 +87,10 @@ class ReportController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $report = Report::findOrFail($id);
+        $report->delete();
+
+        return response()->json(['message' => 'Report deleted successfully.'], 200);
     }
     public function generateNow(){
         return app(GenerateDailyReportJob::class)->handle();

@@ -14,7 +14,10 @@ class DispatchController extends Controller
      */
     public function index()
     {
-        //
+        return Dispatch::query()
+            ->with('truck', 'drivers', 'orderItem.product', 'delivery')
+            ->latest('DispatchDate')
+            ->get();
     }
 
     /**
@@ -22,7 +25,7 @@ class DispatchController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create dispatch endpoint.'], 200);
     }
 
     /**
@@ -52,7 +55,7 @@ class DispatchController extends Controller
                 'TruckID' => $validated['TruckID'],
                 'DispatchDate' => $validated['DispatchDate'],
                 'QuantityDispatched' => $validated['QuantityDispatched'],
-                'Status' => 'Dispatched',
+                'Status' => 'On Route',
             ]);
 
             foreach ($validated['drivers'] as $driver) {
@@ -77,7 +80,7 @@ class DispatchController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return Dispatch::with('truck', 'drivers', 'orderItem.product', 'delivery')->findOrFail($id);
     }
 
     /**
@@ -85,7 +88,18 @@ class DispatchController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'TruckID' => 'sometimes|required|exists:trucks,TruckID',
+            'QuantityDispatched' => 'sometimes|required|integer|min:1',
+            'DispatchDate' => 'sometimes|required|date',
+            'Status' => 'sometimes|required|in:Pending,On Route,Delivered',
+        ]);
+
+        $dispatch = Dispatch::findOrFail($id);
+        $dispatch->fill($validated);
+        $dispatch->save();
+
+        return $dispatch->load('truck', 'drivers', 'orderItem.product', 'delivery');
     }
 
     /**
@@ -93,13 +107,16 @@ class DispatchController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $dispatch = Dispatch::findOrFail($id);
+        $dispatch->delete();
+
+        return response()->json(['message' => 'Dispatch deleted successfully.'], 200);
     }
     public function active(){
         return Dispatch::onRoute()->with('truck', 'drivers', 'orderItem.order')->get();
     }
     public function cancel(Dispatch $dispatch){
-        $dispatch->update(['Status' => 'Cancelled']);
+        $dispatch->update(['Status' => 'Pending']);
         $dispatch->truck()->update(['Status' => 'Available']);
         return $dispatch;
     }

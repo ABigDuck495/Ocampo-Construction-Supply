@@ -16,7 +16,10 @@ class TransactionController extends Controller
      */
     public function index()
     {
-        //
+        return Transaction::query()
+            ->with('order')
+            ->latest('TransactionDate')
+            ->get();
     }
 
     /**
@@ -24,7 +27,7 @@ class TransactionController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create transaction endpoint.'], 200);
     }
 
     /**
@@ -32,7 +35,14 @@ class TransactionController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'OrderID' => 'required|exists:orders,OrderID',
+            'TransactionDate' => 'nullable|date',
+            'Amount' => 'nullable|numeric',
+            'PaymentMethod' => 'nullable|in:Cash,Credit,Cash On Delivery',
+        ]);
+
+        return Transaction::create($validated);
     }
 
     /**
@@ -40,7 +50,7 @@ class TransactionController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return Transaction::with('order')->findOrFail($id);
     }
 
     /**
@@ -48,7 +58,7 @@ class TransactionController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return Transaction::with('order')->findOrFail($id);
     }
 
     /**
@@ -56,7 +66,18 @@ class TransactionController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'OrderID' => 'sometimes|required|exists:orders,OrderID',
+            'TransactionDate' => 'nullable|date',
+            'Amount' => 'nullable|numeric',
+            'PaymentMethod' => 'nullable|in:Cash,Credit,Cash On Delivery',
+        ]);
+
+        $transaction = Transaction::findOrFail($id);
+        $transaction->fill($validated);
+        $transaction->save();
+
+        return $transaction->load('order');
     }
 
     /**
@@ -64,7 +85,10 @@ class TransactionController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $transaction = Transaction::findOrFail($id);
+        $transaction->delete();
+
+        return response()->json(['message' => 'Transaction deleted successfully.'], 200);
     }
     public function posSale(Request $request){
         $validated = $request->validate([
@@ -72,7 +96,7 @@ class TransactionController extends Controller
             'items.*.ProductID' => 'required|exists:products,ProductID',
             'items.*.Quantity' => 'required|integer|min:1',
             'items.*.UnitPrice' => 'required|numeric|min:0',
-            'Payment_method' => 'required|in:Cash,Card,GCash',
+            'PaymentMethod' => 'required|in:Cash,Credit,Cash On Delivery',
         ]);
 
         return DB::transaction(function () use ($validated) {
@@ -86,8 +110,8 @@ class TransactionController extends Controller
 
             $order = Order::create([
                 'CustomerName' => 'Walk-in',
-                'Order_Date' => now(),
-                'Payment_status' => 'Paid',
+                'OrderDate' => now(),
+                'PaymentStatus' => 'Paid',
                 'Status' => 'Completed',
                 'CreatedBy' => auth()->id(),
             ]);
@@ -109,9 +133,8 @@ class TransactionController extends Controller
             $transaction = Transaction::create([
                 'OrderID' => $order->OrderID,
                 'TransactionDate' => now(),
-                'TotalAmount' => $total,
-                'Payment_method' => $validated['Payment_method'],
-                'created_by' => auth()->id(),
+                'Amount' => $total,
+                'PaymentMethod' => $validated['PaymentMethod'],
             ]);
 
             return $transaction->load('order.orderItems.product');
@@ -121,15 +144,15 @@ class TransactionController extends Controller
         $date = $request->date ?? today();
         return [
             'date' => $date,
-            'total' => Transaction::whereDate('TransactionDate', $date)->sum('TotalAmount'),
+            'total' => Transaction::whereDate('TransactionDate', $date)->sum('Amount'),
             'count' => Transaction::whereDate('TransactionDate', $date)->count(),
         ];
     }
     public function byPaymentMethod(Request $request){
         return Transaction::query()
             ->when($request->date, fn($q, $date) => $q->whereDate('TransactionDate', $date))
-            ->selectRaw('Payment_method, COUNT(*) as count, SUM(TotalAmount) as total')
-            ->groupBy('Payment_method')
+            ->selectRaw('PaymentMethod, COUNT(*) as count, SUM(Amount) as total')
+            ->groupBy('PaymentMethod')
             ->get();
     }
 }

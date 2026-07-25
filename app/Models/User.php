@@ -24,10 +24,10 @@ class User extends Model
         $this->save();
     }
 
-    public function scopeAdmins() {
-        return $this->Role === 'Admin';
+    public function scopeAdmins($query) {
+        return $query->where('Role', 'Admin');
     }
-    public function scopeStaffs() {
-        return $this->Role === 'Staff';
+    public function scopeStaffs($query) {
+        return $query->where('Role', 'Staff');
     }
 }

@@ -31,7 +31,10 @@ class Dispatch extends Model
         return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'DispatchID', 'DriverID')->withPivot('Role');
     }
     public function mainDriver(){
-        return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'DispatchID', 'DriverID')->wherePivot('Role', 'Main Driver');
+        return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'DispatchID', 'DriverID')
+            ->where(function ($query) {
+                $query->wherePivot('Role', 'Main')->orWherePivot('Role', 'Main Driver');
+            });
     }
     public function scopeOnRoute($query){
         return $query->where('Status', 'On Route');

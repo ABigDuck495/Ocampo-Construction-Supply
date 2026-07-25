@@ -15,7 +15,10 @@ class DeliveryController extends Controller
      */
     public function index()
     {
-        //
+        return Delivery::query()
+            ->with('dispatch.orderItem.order')
+            ->latest('DeliveryDate')
+            ->get();
     }
 
     /**
@@ -23,7 +26,7 @@ class DeliveryController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create delivery endpoint.'], 200);
     }
 
     /**
@@ -47,7 +50,7 @@ class DeliveryController extends Controller
             ]);
 
             $dispatch->truck()->update(['Status' => 'Available']);
-            $dispatch->update(['Status' => 'Completed']);
+            $dispatch->update(['Status' => 'Delivered']);
             if ($validated['Status'] === 'Delivered') {
                 $product = $dispatch->orderItem->product;
                 $product->inventory?->deduct($validated['QuantityDelivered']);
@@ -71,7 +74,7 @@ class DeliveryController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return Delivery::with('dispatch.orderItem.order')->findOrFail($id);
     }
 
     /**
@@ -79,7 +82,7 @@ class DeliveryController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return Delivery::with('dispatch.orderItem.order')->findOrFail($id);
     }
 
     /**
@@ -87,7 +90,17 @@ class DeliveryController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'QuantityDelivered' => 'sometimes|required|integer|min:0',
+            'Status' => 'sometimes|required|in:Delivered,Failed,Returned',
+            'Notes' => 'nullable|string',
+        ]);
+
+        $delivery = Delivery::findOrFail($id);
+        $delivery->fill($validated);
+        $delivery->save();
+
+        return $delivery->load('dispatch');
     }
 
     /**
@@ -95,7 +108,10 @@ class DeliveryController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $delivery = Delivery::findOrFail($id);
+        $delivery->delete();
+
+        return response()->json(['message' => 'Delivery deleted successfully.'], 200);
     }
     public function failedDeliveries(){
         return Delivery::failed()->with('dispatch.orderItem.order')->get();

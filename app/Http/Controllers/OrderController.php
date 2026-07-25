@@ -47,8 +47,8 @@ class OrderController extends Controller
                 'CustomerName' => $validated['CustomerName'],
                 'Address' => $validated['Address'] ?? null,
                 'ContactNumber' => $validated['ContactNumber'] ?? null,
-                'Order_Date' => now(),
-                'Payment_status' => 'Unpaid',
+                'OrderDate' => now(),
+                'PaymentStatus' => 'Unpaid',
                 'Status' => 'Pending',
                 'CreatedBy' => auth()->id(),
             ]);
@@ -97,7 +97,7 @@ class OrderController extends Controller
             'Address' => 'nullable|string',
             'ContactNumber' => 'nullable|string',
             'Status' => 'nullable|string',
-            'Payment_status' => 'nullable|string',
+            'PaymentStatus' => 'nullable|string',
             'items' => 'sometimes|array|min:1',
             'items.*.ProductID' => 'required_with:items|exists:products,ProductID',
             'items.*.Quantity' => 'required_with:items|integer|min:1',
@@ -120,8 +120,8 @@ class OrderController extends Controller
             if (array_key_exists('Status', $validated)) {
                 $updateData['Status'] = $validated['Status'];
             }
-            if (array_key_exists('Payment_status', $validated)) {
-                $updateData['Payment_status'] = $validated['Payment_status'];
+            if (array_key_exists('PaymentStatus', $validated)) {
+                $updateData['PaymentStatus'] = $validated['PaymentStatus'];
             }
 
             if (! empty($updateData)) {

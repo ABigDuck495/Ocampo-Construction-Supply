@@ -12,7 +12,10 @@ class OrderItemController extends Controller
      */
     public function index()
     {
-        //
+        return OrderItem::query()
+            ->with('order', 'product')
+            ->latest('OrderItemID')
+            ->get();
     }
 
     /**
@@ -20,7 +23,7 @@ class OrderItemController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create order item endpoint.'], 200);
     }
 
     /**
@@ -28,7 +31,14 @@ class OrderItemController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'OrderID' => 'required|exists:orders,OrderID',
+            'ProductID' => 'required|exists:products,ProductID',
+            'Quantity' => 'required|integer|min:1',
+            'Status' => 'nullable|string',
+        ]);
+
+        return OrderItem::create($validated);
     }
 
     /**
@@ -36,7 +46,7 @@ class OrderItemController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return OrderItem::with('order', 'product')->findOrFail($id);
     }
 
     /**
@@ -44,7 +54,7 @@ class OrderItemController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return OrderItem::with('order', 'product')->findOrFail($id);
     }
 
     /**
@@ -52,7 +62,18 @@ class OrderItemController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'OrderID' => 'sometimes|required|exists:orders,OrderID',
+            'ProductID' => 'sometimes|required|exists:products,ProductID',
+            'Quantity' => 'sometimes|required|integer|min:1',
+            'Status' => 'sometimes|required|string',
+        ]);
+
+        $orderItem = OrderItem::findOrFail($id);
+        $orderItem->fill($validated);
+        $orderItem->save();
+
+        return $orderItem->load('order', 'product');
     }
 
     /**
@@ -60,7 +81,10 @@ class OrderItemController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $orderItem = OrderItem::findOrFail($id);
+        $orderItem->delete();
+
+        return response()->json(['message' => 'Order item deleted successfully.'], 200);
     }
 
     public function remaining(OrderItem $orderItem)

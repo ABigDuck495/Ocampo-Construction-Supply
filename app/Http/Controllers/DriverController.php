@@ -13,7 +13,7 @@ class DriverController extends Controller
      */
     public function index()
     {
-        //
+        return Driver::query()->latest('DriverID')->get();
     }
 
     /**
@@ -21,7 +21,7 @@ class DriverController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create driver endpoint.'], 200);
     }
 
     /**
@@ -29,7 +29,12 @@ class DriverController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'Name' => 'required|string|max:255',
+            'PhoneNumber' => 'nullable|string|max:20',
+        ]);
+
+        return Driver::create($validated);
     }
 
     /**
@@ -37,7 +42,7 @@ class DriverController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return Driver::findOrFail($id);
     }
 
     /**
@@ -45,7 +50,7 @@ class DriverController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return Driver::findOrFail($id);
     }
 
     /**
@@ -53,7 +58,16 @@ class DriverController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'Name' => 'sometimes|required|string|max:255',
+            'PhoneNumber' => 'nullable|string|max:20',
+        ]);
+
+        $driver = Driver::findOrFail($id);
+        $driver->fill($validated);
+        $driver->save();
+
+        return $driver;
     }
 
     /**
@@ -61,7 +75,10 @@ class DriverController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $driver = Driver::findOrFail($id);
+        $driver->delete();
+
+        return response()->json(['message' => 'Driver deleted successfully.'], 200);
     }
     public function available(){
         $busyDriverIds = DispatchDriver::whereHas('dispatch', fn($q) => $q->where('Status', 'Dispatched'))

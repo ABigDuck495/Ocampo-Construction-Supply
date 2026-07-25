@@ -12,7 +12,7 @@ class UserController extends Controller
      */
     public function index()
     {
-        //
+        return User::query()->latest('UserID')->get();
     }
 
     /**
@@ -20,7 +20,7 @@ class UserController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create user endpoint.'], 200);
     }
 
     /**
@@ -28,7 +28,15 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'Name' => 'required|string|max:255',
+            'Password' => 'required|string|min:6',
+            'Role' => 'nullable|string|max:50',
+            'Email' => 'nullable|email|max:255',
+            'PhoneNumber' => 'nullable|string|max:20',
+        ]);
+
+        return User::create($validated);
     }
 
     /**
@@ -36,7 +44,7 @@ class UserController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return User::findOrFail($id);
     }
 
     /**
@@ -44,7 +52,7 @@ class UserController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return User::findOrFail($id);
     }
 
     /**
@@ -52,7 +60,19 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'Name' => 'sometimes|required|string|max:255',
+            'Password' => 'nullable|string|min:6',
+            'Role' => 'nullable|string|max:50',
+            'Email' => 'nullable|email|max:255',
+            'PhoneNumber' => 'nullable|string|max:20',
+        ]);
+
+        $user = User::findOrFail($id);
+        $user->fill($validated);
+        $user->save();
+
+        return $user;
     }
 
     /**
@@ -60,12 +80,15 @@ class UserController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $user = User::findOrFail($id);
+        $user->delete();
+
+        return response()->json(['message' => 'User deleted successfully.'], 200);
     }
     public function activity(Request $request, User $user){
         return [
             'orders_created' => $user->orders()
-                ->when($request->date, fn($q) => $q->whereDate('Order_Date', $request->date))
+                ->when($request->date, fn($q) => $q->whereDate('OrderDate', $request->date))
                 ->count(),
             'transactions_processed' => $user->transactions()
                 ->when($request->date, fn($q) => $q->whereDate('TransactionDate', $request->date))

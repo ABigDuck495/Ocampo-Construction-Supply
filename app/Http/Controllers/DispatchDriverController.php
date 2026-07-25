@@ -14,7 +14,10 @@ class DispatchDriverController extends Controller
      */
     public function index()
     {
-        //
+        return DispatchDriver::query()
+            ->with('dispatch', 'driver')
+            ->latest('DispatchDriverID')
+            ->get();
     }
 
     /**
@@ -22,7 +25,7 @@ class DispatchDriverController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create dispatch driver assignment endpoint.'], 200);
     }
 
     /**
@@ -30,7 +33,15 @@ class DispatchDriverController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'DispatchID' => 'required|exists:dispatches,DispatchID',
+            'DriverID' => 'required|exists:drivers,DriverID',
+            'Role' => 'required|in:Main,Assistant',
+        ]);
+
+        $assignment = DispatchDriver::create($validated);
+
+        return $assignment->load('dispatch', 'driver');
     }
 
     /**
@@ -38,7 +49,7 @@ class DispatchDriverController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return DispatchDriver::with('dispatch', 'driver')->findOrFail($id);
     }
 
     /**
@@ -46,7 +57,7 @@ class DispatchDriverController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return DispatchDriver::with('dispatch', 'driver')->findOrFail($id);
     }
 
     /**
@@ -54,7 +65,17 @@ class DispatchDriverController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'DispatchID' => 'sometimes|required|exists:dispatches,DispatchID',
+            'DriverID' => 'sometimes|required|exists:drivers,DriverID',
+            'Role' => 'sometimes|required|in:Main,Assistant',
+        ]);
+
+        $assignment = DispatchDriver::findOrFail($id);
+        $assignment->fill($validated);
+        $assignment->save();
+
+        return $assignment->load('dispatch', 'driver');
     }
 
     /**
@@ -62,7 +83,10 @@ class DispatchDriverController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $assignment = DispatchDriver::findOrFail($id);
+        $assignment->delete();
+
+        return response()->json(['message' => 'Dispatch driver assignment deleted successfully.'], 200);
     }
     public function assign(Request $request, Dispatch $dispatch){
         $validated = $request->validate([
@@ -101,7 +125,7 @@ class DispatchDriverController extends Controller
     }
     private function isDriverBusy(int $driverId): bool{
         return DispatchDriver::where('DriverID', $driverId)
-            ->whereHas('dispatch', fn($q) => $q->where('Status', 'Dispatched'))
+            ->whereHas('dispatch', fn($q) => $q->whereIn('Status', ['On Route', 'Delivered']))
             ->exists();
     }
     public function history(Driver $driver){

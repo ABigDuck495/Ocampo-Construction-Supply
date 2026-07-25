@@ -28,12 +28,12 @@ class Transaction extends Model
     //     return $this->hasManyThrough(Inventory::class, Product::class, 'ProductID', 'ProductID', 'ProductID', 'ProductID');
     // }
     public function scopeByMethod($query, $method) {
-        return $query->where('Payment_method', $method);
+        return $query->where('PaymentMethod', $method);
     }
     public function scopeToday($query) {
         return $query->whereDate('TransactionDate', today());
     }
     public function totalForDate($date){
-        return static::whereDate('TransactionDate', $date)->sum('TotalAmount');
+        return static::whereDate('TransactionDate', $date)->sum('Amount');
     }
 }

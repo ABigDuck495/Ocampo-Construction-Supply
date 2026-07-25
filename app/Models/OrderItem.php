@@ -22,6 +22,10 @@ class OrderItem extends Model
     public function product(){
         return $this->belongsTo(Product::class, 'ProductID', 'ProductID');
     }
+
+    public function dispatches(){
+        return $this->hasMany(Dispatch::class, 'OrderItemID', 'OrderItemID');
+    }
     // public function dispatches(){
     //     return $this->hasMany(Dispatch::class, 'OrderItemID', 'OrderItemID');
     // }
@@ -41,7 +45,9 @@ class OrderItem extends Model
         return $this->Quantity * $this->product->UnitPrice;
     }
     public function quantityDispatched() {
-        return $this->dispatches->sum('QuantityDispatched');
+        return $this->relationLoaded('dispatches')
+            ? $this->dispatches->sum('QuantityDispatched')
+            : $this->dispatches()->sum('QuantityDispatched');
     }
     public function quantityRemaining() {
         return $this->Quantity - $this->quantityDispatched();

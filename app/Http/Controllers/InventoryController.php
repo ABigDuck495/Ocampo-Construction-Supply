@@ -13,7 +13,10 @@ class InventoryController extends Controller
      */
     public function index()
     {
-        //
+        return Inventory::query()
+            ->with('product')
+            ->latest('InventoryID')
+            ->get();
     }
 
     /**
@@ -21,7 +24,7 @@ class InventoryController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create inventory entry endpoint.'], 200);
     }
 
     /**
@@ -29,7 +32,19 @@ class InventoryController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'ProductID' => 'required|exists:products,ProductID',
+            'QuantityOnHand' => 'required|integer|min:0',
+            'ReorderLevel' => 'nullable|integer|min:0',
+        ]);
+
+        $inventory = Inventory::create([
+            'ProductID' => $validated['ProductID'],
+            'QuantityOnHand' => $validated['QuantityOnHand'],
+            'ReorderLevel' => $validated['ReorderLevel'] ?? 10,
+        ]);
+
+        return $inventory->load('product');
     }
 
     /**
@@ -37,7 +52,7 @@ class InventoryController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return Inventory::with('product')->findOrFail($id);
     }
 
     /**
@@ -45,7 +60,7 @@ class InventoryController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return Inventory::with('product')->findOrFail($id);
     }
 
     /**
@@ -53,7 +68,17 @@ class InventoryController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'ProductID' => 'sometimes|required|exists:products,ProductID',
+            'QuantityOnHand' => 'sometimes|required|integer|min:0',
+            'ReorderLevel' => 'sometimes|required|integer|min:0',
+        ]);
+
+        $inventory = Inventory::findOrFail($id);
+        $inventory->fill($validated);
+        $inventory->save();
+
+        return $inventory->load('product');
     }
 
     /**
@@ -61,7 +86,10 @@ class InventoryController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $inventory = Inventory::findOrFail($id);
+        $inventory->delete();
+
+        return response()->json(['message' => 'Inventory entry deleted successfully.'], 200);
     }
     public function adjust(Request $request, Inventory $inventory){
         $validated = $request->validate([

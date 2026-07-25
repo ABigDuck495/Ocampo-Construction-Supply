@@ -12,7 +12,7 @@ class TruckController extends Controller
      */
     public function index()
     {
-        //
+        return Truck::query()->latest('TruckID')->get();
     }
 
     /**
@@ -20,7 +20,7 @@ class TruckController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json(['message' => 'Create truck endpoint.'], 200);
     }
 
     /**
@@ -28,7 +28,14 @@ class TruckController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'TruckName' => 'nullable|string|max:255',
+            'PlateNumber' => 'nullable|string|max:50',
+            'Capacity' => 'nullable|numeric',
+            'Status' => 'nullable|in:Available,Unavailable',
+        ]);
+
+        return Truck::create($validated);
     }
 
     /**
@@ -36,7 +43,7 @@ class TruckController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return Truck::findOrFail($id);
     }
 
     /**
@@ -44,7 +51,7 @@ class TruckController extends Controller
      */
     public function edit(string $id)
     {
-        //
+        return Truck::findOrFail($id);
     }
 
     /**
@@ -52,7 +59,18 @@ class TruckController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $validated = $request->validate([
+            'TruckName' => 'sometimes|required|string|max:255',
+            'PlateNumber' => 'nullable|string|max:50',
+            'Capacity' => 'nullable|numeric',
+            'Status' => 'nullable|in:Available,Unavailable',
+        ]);
+
+        $truck = Truck::findOrFail($id);
+        $truck->fill($validated);
+        $truck->save();
+
+        return $truck;
     }
 
     /**
@@ -60,7 +78,10 @@ class TruckController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $truck = Truck::findOrFail($id);
+        $truck->delete();
+
+        return response()->json(['message' => 'Truck deleted successfully.'], 200);
     }
     public function available(){
         return Truck::available()->get();
