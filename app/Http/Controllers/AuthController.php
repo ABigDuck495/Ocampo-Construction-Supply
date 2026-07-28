@@ -18,20 +18,28 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('Email', $validated['email'])->first();
+        if (! Auth::attempt(['Email' => $validated['email'], 'password' => $validated['password']])) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Invalid credentials.'], 401);
+            }
 
-        if (! $user || ! Hash::check($validated['password'], $user->Password)) {
-            return response()->json(['message' => 'Invalid credentials.'], 401);
+            return back()->withErrors([
+                'email' => 'Invalid credentials.',
+            ])->onlyInput('email');
         }
 
-        Auth::login($user);
+        $user = Auth::user();
 
         $request->session()->regenerate();
 
-        return response()->json([
-            'message' => 'Logged in successfully.',
-            'user' => $user,
-        ]);
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Logged in successfully.',
+                'user' => $user,
+            ]);
+        }
+
+        return redirect()->intended('/pos');
     }
 
     public function logout(Request $request){
