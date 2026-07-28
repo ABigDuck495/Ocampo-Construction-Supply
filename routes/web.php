@@ -13,11 +13,22 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TruckController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\AuthController as LoginController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
-    return view('welcome');
+    if (Auth::check()) {
+        return redirect()->route('pos.index');
+    }
+
+    return redirect()->route('login');
 });
+
+Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('login', [LoginController::class, 'login']);
+// Provide GET for /auth/login to avoid MethodNotAllowed for GET requests to that URI
+Route::get('auth/login', [LoginController::class, 'showLoginForm']);
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->name('login');
