@@ -15,6 +15,7 @@ class User extends Authenticatable
     protected $hidden = ['Password'];
 
     protected $guarded = ['UserID'];
+    public $timestamps = false;
 
     public function orders(){
         return $this->hasMany(Order::class, 'CreatedBy', 'UserID');
