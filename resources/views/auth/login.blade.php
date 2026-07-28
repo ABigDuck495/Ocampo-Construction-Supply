@@ -182,7 +182,7 @@
                 @csrf
 
                 <div>
-                    <label for="username" class="ih-label block text-xs font-semibold uppercase mb-2">Username</label>
+                    <label for="email" class="ih-label block text-xs font-semibold uppercase mb-2">Email</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-3 flex items-center ih-subtitle">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -191,17 +191,18 @@
                             </svg>
                         </span>
                         <input
-                            type="text"
-                            id="username"
-                            name="username"
-                            value="{{ old('username') }}"
-                            placeholder="Enter username"
-                            autocomplete="username"
+                            type="email"
+                            id="email"
+                            name="email"
+                            value="{{ old('email') }}"
+                            placeholder="Enter email"
+                            autocomplete="email"
                             required
                             class="ih-input ih-mono w-full rounded-lg pl-10 pr-4 py-3 text-sm"
                         >
                     </div>
-                </div>
+                </div>  
+                    
 
                 <div>
                     <label for="password" class="ih-label block text-xs font-semibold uppercase mb-2">Password</label>
