@@ -20,7 +20,7 @@ return new class extends Migration
             $table->integer('TotalItemsSold');            
             $table->integer('TotalDeliveries');            
             $table->integer('TotalDispatches');            
-            $table->string('Notes');            
+            $table->string('Notes')->nullable();            
         });
     }
 
