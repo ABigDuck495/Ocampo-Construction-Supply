@@ -38,28 +38,28 @@ class DatabaseSeeder extends Seeder
         $users = [
             [
                 'Name'        => 'Admin123',
-                'Email'       => 'admin123@example.com',
+                'Email'       => 'admin123@gmail.com',
                 'Password'    => Hash::make('Pass123'),
                 'Role'        => 'Admin',
                 'PhoneNumber' => '09064093019',
             ],
             [
                 'Name'        => 'Staff',
-                'Email'       => 'staff123@example.com',
+                'Email'       => 'staff123@gmail.com',
                 'Password'    => Hash::make('Pass123'),
                 'Role'        => 'Staff',
                 'PhoneNumber' => '09774484907',
             ],
         ];
-        // foreach ($users as $user) {
-        //     $user['created_at'] = now();
-        //     $user['updated_at'] = now();
-        //     DB::table('users')->insert($user);
-        // }
 
-        // Get user IDs for later reference
-        $adminId = DB::table('users')->where('Email', 'admin@example.com')->value('UserID');
-        $staffId = DB::table('users')->where('Email', 'staff@example.com')->value('UserID');
+        $createdUsers = [];
+        foreach ($users as $user) {
+            $id = DB::table('users')->insertGetId($user);
+            $createdUsers[] = $id;
+        }
+
+        $adminId = DB::table('users')->where('Email', 'admin123@gmail.com')->value('UserID');
+        $staffId = DB::table('users')->where('Email', 'staff123@gmail.com')->value('UserID');
 
         // ----------------------------------------
         // 2. Products
