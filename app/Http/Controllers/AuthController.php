@@ -39,7 +39,7 @@ class AuthController extends Controller
             ]);
         }
 
-        return redirect()->intended('/pos');
+        return redirect()->intended(route('deliveries.index'));
     }
 
     public function logout(Request $request){
