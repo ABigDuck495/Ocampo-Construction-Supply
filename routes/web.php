@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
     if (Auth::check()) {
-        return redirect()->route('pos.index');
+        return redirect()->route('deliveries.index');
     }
 
     return redirect()->route('login');
@@ -51,6 +51,9 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('trucks', TruckController::class);
         Route::resource('transactions', TransactionController::class);
         Route::resource('reports', ReportController::class);
+        // Route::get('/pos', function () {
+        //     return view('pos');
+        // })->name('pos.index');
 
         Route::get('products/search', [ProductController::class, 'search']);
         Route::get('products/top-selling', [ProductController::class, 'topSelling']);

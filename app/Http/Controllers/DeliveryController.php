@@ -15,10 +15,7 @@ class DeliveryController extends Controller
      */
     public function index()
     {
-        return Delivery::query()
-            ->with('dispatch.orderItem.order')
-            ->latest('DeliveryDate')
-            ->get();
+        return view('deliveries.index');
     }
 
     /**
