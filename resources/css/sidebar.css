@@ -1,0 +1,132 @@
+/* ============================================================
+   SIDEBAR STYLES
+   ============================================================ */
+
+.sidebar{
+    width:220px;
+    flex-shrink:0;
+    background:#0d0f16;
+    border-right:2px solid var(--border-hard);
+    display:flex;
+    flex-direction:column;
+    padding:18px 14px;
+    height:100vh;
+    position:sticky;
+    top:0;
+    overflow:hidden;   /* sidebar itself never scrolls */
+}
+.brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 6px 20px 6px;
+    border-bottom:2px solid var(--border);
+    margin-bottom:16px;
+}
+.brand-icon{
+    width:34px;height:34px;
+    background:linear-gradient(160deg,#ffcf6b,var(--orange-dark));
+    border:2px solid #000;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 1px #000, 0 0 14px var(--orange-glow);
+}
+.brand-icon svg{width:18px;height:18px;color:#1a1305;}
+.brand-name{font-weight:800;font-size:12px;letter-spacing:.04em;color:var(--orange);line-height:1.3;}
+.brand-sub{font-size:9px;color:var(--text-dim);letter-spacing:.05em;}
+
+.nav{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;overflow:hidden;}
+.nav-item{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;
+    padding:10px 10px;
+    color:var(--text-dim);
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-decoration:none;
+    border:2px solid transparent;
+    cursor:pointer;
+    user-select:none;
+}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;}
+.nav-item .lbl{display:flex;align-items:center;gap:10px;flex:1;}
+.nav-item:hover{color:var(--text);}
+.nav-item.active{
+    background:var(--orange);
+    color:#1a1305;
+    border-color:#000;
+    box-shadow:2px 2px 0 #000;
+}
+.nav-badge{
+    background:#000;
+    color:var(--orange);
+    font-size:10px;
+    font-weight:800;
+    padding:1px 6px;
+    border:1px solid #000;
+}
+.nav-item.active .nav-badge{background:#1a1305;color:var(--orange);}
+
+/* ---------- SIDEBAR FOOTER (theme toggle + sign out) ---------- */
+.sidebar-footer{
+    margin-top:auto;
+    padding-top:14px;
+    border-top:2px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    flex-shrink:0;
+}
+
+.theme-toggle{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    background:var(--panel-alt);
+    border:2px solid var(--border);
+    color:var(--text-dim);
+    font-family:inherit;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.04em;
+    padding:9px 10px;
+    cursor:pointer;
+}
+.theme-toggle:hover{color:var(--text);border-color:var(--text-dim);}
+.theme-toggle-icon{width:15px;height:15px;flex-shrink:0;display:flex;}
+.theme-toggle-icon svg{width:15px;height:15px;}
+
+.signout-btn{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:transparent;
+    border:2px solid var(--red);
+    color:var(--red);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.04em;
+    padding:9px 10px;
+    text-decoration:none;
+    cursor:pointer;
+}
+.signout-btn:hover{background:var(--red);color:#1a0505;}
+.signout-btn svg{width:15px;height:15px;flex-shrink:0;}
+
+/* ---------- LIGHT MODE ----------
+   Toggled by adding class="light-mode" to <body> via sidebar.js.
+   Overriding the custom properties here cascades to the whole
+   page (sidebar + main content) since both read the same vars. */
+body.light-mode{
+    --bg:#f4f2ec;
+    --panel:#ffffff;
+    --panel-alt:#eeece3;
+    --border:#d8d5c8;
+    --border-hard:#000;
+    --text:#1a1a1a;
+    --text-dim:#5a5f6b;
+    --text-faint:#8a8f9c;
+}
+body.light-mode .sidebar{background:#fff;}
+body.light-mode .brand-icon svg{color:#1a1305;}
