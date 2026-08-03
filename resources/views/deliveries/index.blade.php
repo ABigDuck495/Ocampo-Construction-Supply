@@ -7,6 +7,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
 
+<!-- Data from DeliveryController@index / DispatchController@index -->
+<script>
+    window.DELIVERY_DATA = {
+        orders: @json($orders),
+        trucks: @json($trucks),
+    };
+</script>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script>
+    window.DISPATCH_DATA = { orders: @json($orders), trucks: @json($trucks) };
+</script>
+
+<!-- Separated scripts -->
+@vite(['resources/js/pages/deliveries.js', 'resources/js/pages/sidebar.js'])
 <!-- Separated stylesheets -->
 @vite(['resources/css/deliveries.css', 'resources/css/sidebar.css'])
 </head>

@@ -94,7 +94,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.ProductID' => 'required|exists:products,ProductID',
-            'items.*.Quantity' => 'required|integer|min:1',
+            'items.*.Quantity' => 'required|string|max:50',
             'items.*.UnitPrice' => 'required|numeric|min:0',
             'PaymentMethod' => 'required|in:Cash,Credit,Cash On Delivery',
         ]);
@@ -103,7 +103,8 @@ class TransactionController extends Controller
             // Check stock availability before committing to the sale
             foreach ($validated['items'] as $item) {
                 $product = Product::findOrFail($item['ProductID']);
-                if (($product->inventory?->QuantityOnHand ?? 0) < $item['Quantity']) {
+                $qtyValue = (float) $item['Quantity'];
+                if (($product->inventory?->QuantityOnHand ?? 0) < $qtyValue) {
                     abort(422, "Insufficient stock for {$product->Product_Name}.");
                 }
             }
@@ -118,16 +119,18 @@ class TransactionController extends Controller
 
             $total = 0;
             foreach ($validated['items'] as $item) {
+                $qtyValue = (float) $item['Quantity'];
+
                 $order->orderItems()->create([
                     'ProductID' => $item['ProductID'],
-                    'Quantity' => $item['Quantity'],
+                    'Quantity' => $item['Quantity'], // stored as typed, e.g. "5kg"
                     'Status' => 'Fulfilled',
                 ]);
 
                 // Deduct inventory immediately since POS sales are instant handoffs
-                Product::find($item['ProductID'])->inventory?->deduct($item['Quantity']);
+                Product::find($item['ProductID'])->inventory?->deduct($qtyValue);
 
-                $total += $item['Quantity'] * $item['UnitPrice'];
+                $total += $qtyValue * $item['UnitPrice'];
             }
 
             $transaction = Transaction::create([

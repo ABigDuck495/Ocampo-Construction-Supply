@@ -34,11 +34,11 @@ class GenerateDailyReportJob implements ShouldQueue
             $existing->delete();
         }
 
-        $totalOrders = Order::whereDate('Order_Date', $date)->count();
+        $totalOrders = Order::whereDate('OrderDate', $date)->count();
 
         $totalSales = Transaction::whereDate('TransactionDate', $date)->sum('TotalAmount');
 
-        $totalItemsSold = Order::whereDate('Order_Date', $date)
+        $totalItemsSold = Order::whereDate('OrderDate', $date)
             ->with('orderItems')
             ->get()
             ->flatMap->orderItems

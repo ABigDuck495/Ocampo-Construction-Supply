@@ -6,7 +6,16 @@
 <title>POS - Ironclad Hardware</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
-
+<script>
+    window.POS_DATA = {
+        products: @json($products),
+    };
+</script>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script>
+    window.POS_DATA = { products: @json($products) };
+</script>
+@vite(['resources/js/pages/sidebar.js', 'resources/js/pages/pos.js'])
 <!-- Shared stylesheets (same design system as Delivery Ops) -->
 @vite(['resources/css/deliveries.css', 'resources/css/sidebar.css', 'resources/css/pos.css'])
 </head>

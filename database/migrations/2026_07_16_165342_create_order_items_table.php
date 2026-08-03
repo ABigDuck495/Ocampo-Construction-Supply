@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id('OrderItemID');
             $table->unsignedBigInteger('OrderID');
             $table->unsignedBigInteger('ProductID');
-            $table->integer('Quantity')->default(1);
+            $table->string('Quantity', 255)->default(1);
             $table->enum('Status', ['Pending', 'In Progress', 'Completed'])->default('Pending');
             $table->timestamps();
             $table->foreign('OrderID')->references('OrderID')->on('orders')->onDelete('cascade');

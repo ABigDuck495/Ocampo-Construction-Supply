@@ -5,12 +5,14 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/pt210-printer.js'],
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
+                'resources/js/pt210-printer.js',
                 'resources/css/sidebar.css',
                 'resources/css/deliveries.css',
+                'resources/css/pos.css',
+                'resources/js/pages/pos.js',
                 'resources/js/pages/deliveries.js',
                 'resources/js/pages/sidebar.js',
             ],

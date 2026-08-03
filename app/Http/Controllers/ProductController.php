@@ -102,11 +102,12 @@ class ProductController extends Controller
                 ->when($request->start, fn($q2) => $q2->whereDate('OrderDate', '>=', $request->start))
                 ->when($request->end, fn($q2) => $q2->whereDate('OrderDate', '<=', $request->end))
             )
-            ->selectRaw('ProductID, SUM(Quantity) as total_sold')
+            ->selectRaw('ProductID, SUM(CAST(Quantity AS DECIMAL(10,2))) as total_sold')
             ->groupBy('ProductID')
             ->orderByDesc('total_sold')
             ->with('product')
             ->limit(10)
             ->get();
     }
+    
 }

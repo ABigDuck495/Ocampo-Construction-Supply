@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\OrderItem;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OrderItemController extends Controller
 {
@@ -35,7 +36,7 @@ class OrderItemController extends Controller
             'OrderID' => 'required|exists:orders,OrderID',
             'ProductID' => 'required|exists:products,ProductID',
             'Quantity' => 'required|integer|min:1',
-            'Status' => 'nullable|string',
+            'Status' => ['nullable', 'string', Rule::in(array_merge(OrderItem::allowedStatuses(), ['Partially Fulfilled', 'Fulfilled']))],
         ]);
 
         return OrderItem::create($validated);
@@ -66,7 +67,7 @@ class OrderItemController extends Controller
             'OrderID' => 'sometimes|required|exists:orders,OrderID',
             'ProductID' => 'sometimes|required|exists:products,ProductID',
             'Quantity' => 'sometimes|required|integer|min:1',
-            'Status' => 'sometimes|required|string',
+            'Status' => ['sometimes', 'required', 'string', Rule::in(array_merge(OrderItem::allowedStatuses(), ['Partially Fulfilled', 'Fulfilled']))],
         ]);
 
         $orderItem = OrderItem::findOrFail($id);
@@ -99,7 +100,7 @@ class OrderItemController extends Controller
     // Update fulfillment status for a specific line item
     public function updateStatus(Request $request, OrderItem $orderItem)
     {
-        $request->validate(['Status' => 'required|in:Pending,Partially Fulfilled,Fulfilled']);
+        $request->validate(['Status' => ['required', 'string', Rule::in(array_merge(OrderItem::allowedStatuses(), ['Partially Fulfilled', 'Fulfilled']))]]);
         $orderItem->update(['Status' => $request->Status]);
         return $orderItem;
     }

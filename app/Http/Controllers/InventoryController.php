@@ -118,21 +118,23 @@ class InventoryController extends Controller
     public function outOfStock(){
         return Inventory::outOfStock()->with('product')->get();
     }
-    public function checkAvailability(Request $request){
+    public function checkAvailability(Request $request)
+    {
         $validated = $request->validate([
             'items' => 'required|array',
             'items.*.ProductID' => 'required|exists:products,ProductID',
-            'items.*.Quantity' => 'required|integer|min:1',
+            'items.*.Quantity' => 'required|string|max:50',
         ]);
 
         $results = [];
         foreach ($validated['items'] as $item) {
             $onHand = Product::find($item['ProductID'])->inventory?->QuantityOnHand ?? 0;
+            $requestedValue = (float) $item['Quantity'];
             $results[] = [
                 'ProductID' => $item['ProductID'],
                 'requested' => $item['Quantity'],
                 'available' => $onHand,
-                'sufficient' => $onHand >= $item['Quantity'],
+                'sufficient' => $onHand >= $requestedValue,
             ];
         }
         return $results;

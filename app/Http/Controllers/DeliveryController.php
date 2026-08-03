@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\OrderController;
 use App\Models\Delivery;
 use App\Models\Dispatch;
+use App\Models\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +16,9 @@ class DeliveryController extends Controller
      */
     public function index()
     {
-        return view('deliveries.index');
+        $trucks = Dispatch::with('truck')->get();
+        $orders = Delivery::with('dispatch.orderItem.order')->get();
+        return view('deliveries.index', compact('orders', 'trucks'));
     }
 
     /**
@@ -54,9 +57,9 @@ class DeliveryController extends Controller
 
                 $orderItem = $dispatch->orderItem;
                 if ($orderItem->quantityDispatched() >= $orderItem->Quantity) {
-                    $orderItem->update(['Status' => 'Fulfilled']);
+                    $orderItem->update(['Status' => OrderItem::STATUS_COMPLETED]);
                 } else {
-                    $orderItem->update(['Status' => 'Partially Fulfilled']);
+                    $orderItem->update(['Status' => OrderItem::STATUS_IN_PROGRESS]);
                 }
 
                 app(OrderController::class)->syncStatus($orderItem->order);

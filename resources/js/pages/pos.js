@@ -1,22 +1,21 @@
 /* ============================================================
-   POS - DATA + LOGIC
+   POS - DATA + LOGIC (wired to backend)
    ============================================================ */
 
-/* ---------------- CATALOG ---------------- */
-const products = [
-    { id:'P01', name:'Titanium Hammer',      cat:'Tools',      price:12.50 },
-    { id:'P02', name:'Cordless Drill 18V',   cat:'Tools',      price:54.00 },
-    { id:'P03', name:'Paint Roller Set',     cat:'Paint',      price:6.40  },
-    { id:'P04', name:'Latex Paint 1L',       cat:'Paint',      price:5.20  },
-    { id:'P05', name:'Hex Bolt M8 x50',      cat:'Hardware',   price:3.20  },
-    { id:'P06', name:'Steel Nails 1kg',      cat:'Hardware',   price:3.15  },
-    { id:'P07', name:'Safety Gloves L',      cat:'Hardware',   price:3.15  },
-    { id:'P08', name:'PVC Pipe 3/4"',        cat:'Plumbing',   price:4.10  },
-    { id:'P09', name:'PVC Elbow Joint',      cat:'Plumbing',   price:1.80  },
-    { id:'P10', name:'Circuit Breaker 20A',  cat:'Electrical', price:9.75  },
-    { id:'P11', name:'Electrical Wire 10m',  cat:'Electrical', price:7.90  },
-    { id:'P12', name:'LED Bulb 9W',          cat:'Electrical', price:2.60  },
-];
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+/* ---------------- CATALOG (from PosController@index) ---------------- */
+// window.POS_DATA.products is injected by the Blade view:
+// each item: { ProductID, Product_Name, Category, UnitPrice, inventory: { QuantityOnHand } }
+const rawProducts = (window.POS_DATA && window.POS_DATA.products) || [];
+
+const products = rawProducts.map(p => ({
+    id: p.ProductID,
+    name: p.Product_Name,
+    cat: p.Category || 'Hardware', // falls back until every product has a Category set
+    price: Number(p.UnitPrice) || 0,
+    stock: p.inventory ? Number(p.inventory.QuantityOnHand) : 0,
+}));
 
 const icons = {
     Tools:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
@@ -25,14 +24,15 @@ const icons = {
     Plumbing:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z"/><path d="M14 14h6v6h-6z"/><path d="M10 7h4v7h-4z"/></svg>',
     Electrical: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7v8l10-12h-7z"/></svg>',
 };
+function iconFor(cat){ return icons[cat] || icons.Hardware; }
 
 /* ---------------- STATE ---------------- */
-let cart = [];        // [{ id, name, price, qty }]
+let cart = [];        // [{ id, name, price, qty, stock }]
 let activeCat = 'all';
 let selectedPayment = null;
 let orderType = 'Delivery';
 
-function fmt(n){ return '$' + n.toFixed(2); }
+function fmt(n){ return '$' + Number(n).toFixed(2); }
 
 /* ---------------- RENDER: PRODUCTS ---------------- */
 function renderProducts(){
@@ -41,7 +41,7 @@ function renderProducts(){
 
     grid.innerHTML = list.map(p => `
         <div class="product-card" data-id="${p.id}">
-            <div class="product-icon">${icons[p.cat]}</div>
+            <div class="product-icon">${iconFor(p.cat)}</div>
             <div class="product-name">${p.name}</div>
             <div class="product-cat">${p.cat}</div>
             <div class="product-price">${fmt(p.price)}</div>
@@ -54,24 +54,38 @@ function renderProducts(){
 
 /* ---------------- CART LOGIC ---------------- */
 function addToCart(productId){
-    const product = products.find(p => p.id === productId);
+    const product = products.find(p => String(p.id) === String(productId));
     if(!product) return;
-    const existing = cart.find(c => c.id === productId);
+
+    const existing = cart.find(c => String(c.id) === String(productId));
+    const currentQty = existing ? existing.qty : 0;
+
+    if(currentQty + 1 > product.stock){
+        alert(`Not enough stock for ${product.name}. Available: ${product.stock}`);
+        return;
+    }
+
     if(existing){ existing.qty += 1; }
-    else { cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 }); }
+    else { cart.push({ id: product.id, name: product.name, price: product.price, qty: 1, stock: product.stock }); }
     renderCart();
 }
 
 function changeQty(productId, delta){
-    const item = cart.find(c => c.id === productId);
+    const item = cart.find(c => String(c.id) === String(productId));
     if(!item) return;
+
+    if(delta > 0 && item.qty + 1 > item.stock){
+        alert(`Not enough stock for ${item.name}. Available: ${item.stock}`);
+        return;
+    }
+
     item.qty += delta;
-    if(item.qty <= 0) cart = cart.filter(c => c.id !== productId);
+    if(item.qty <= 0) cart = cart.filter(c => String(c.id) !== String(productId));
     renderCart();
 }
 
 function removeFromCart(productId){
-    cart = cart.filter(c => c.id !== productId);
+    cart = cart.filter(c => String(c.id) !== String(productId));
     renderCart();
 }
 
@@ -160,11 +174,6 @@ document.getElementById('paymentOptions').addEventListener('click', e => {
 });
 
 /* ---------------- CHECKOUT / RECEIPT ---------------- */
-function generateOrderId(){
-    const n = Math.floor(100000 + Math.random() * 900000);
-    return `RC-${n}`;
-}
-
 let pendingOrder = null;
 
 document.getElementById('checkoutBtn').addEventListener('click', () => {
@@ -190,18 +199,15 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
     }
 
     pendingOrder = {
-        id: generateOrderId(),
         customer: name,
         contact: contact,
         address: isPickup ? 'Pickup at store' : address,
         notes: notes,
         orderType: orderType,
-        items: cart.map(i => ({ name: i.name, qty: i.qty })),
+        items: cart.map(i => ({ productId: i.id, name: i.name, qty: i.qty, price: i.price })),
         total: cartTotal(),
         payment: selectedPayment,
         paymentStatus: paymentStatus,
-        status: 'pending',
-        truck: null,
     };
 
     renderReceipt(pendingOrder);
@@ -215,7 +221,6 @@ function renderReceipt(order){
     paper.innerHTML = `
         <h2>IRONCLAD HARDWARE</h2>
         <div class="r-sub">Ocampo Construction &amp; Hardware Supplies</div>
-        <div class="r-meta">Order: ${order.id}</div>
         <div class="r-meta">Date: ${now}</div>
         <div class="r-meta">Customer: ${order.customer}</div>
         <div class="r-meta">Contact: ${order.contact}</div>
@@ -241,39 +246,68 @@ document.getElementById('printBtn').addEventListener('click', () => {
     window.print();
 });
 
-/* Confirm & Send to Delivery:
-   Stores the order for Delivery Ops to pick up, then redirects. */
-document.getElementById('confirmBtn').addEventListener('click', () => {
+/* Confirm & Send: actually persists the sale via TransactionController@posSale */
+document.getElementById('confirmBtn').addEventListener('click', async () => {
     if(!pendingOrder) return;
 
-    try{
-        const existing = JSON.parse(localStorage.getItem('pendingDeliveryOrders') || '[]');
-        existing.push(pendingOrder);
-        localStorage.setItem('pendingDeliveryOrders', JSON.stringify(existing));
-    } catch(err){
-        console.error('Could not queue order for delivery:', err);
+    const confirmBtn = document.getElementById('confirmBtn');
+    confirmBtn.disabled = true;
+
+    try {
+        const res = await fetch('/transactions/pos-sale', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                items: pendingOrder.items.map(i => ({
+                    ProductID: i.productId,
+                    Quantity: String(i.qty),
+                    UnitPrice: i.price,
+                })),
+                PaymentMethod: pendingOrder.payment,
+                OrderType: pendingOrder.orderType,
+                CustomerName: pendingOrder.customer,
+                ContactNumber: pendingOrder.contact,
+                Address: pendingOrder.address,
+                Notes: pendingOrder.notes,
+                PaymentStatus: pendingOrder.paymentStatus,
+            }),
+        });
+
+        if(!res.ok){
+            const err = await res.json().catch(() => ({}));
+            alert(err.message || 'Something went wrong processing the sale.');
+            confirmBtn.disabled = false;
+            return;
+        }
+
+        // reset POS state
+        cart = [];
+        pendingOrder = null;
+        selectedPayment = null;
+        orderType = 'Delivery';
+        document.getElementById('custName').value = '';
+        document.getElementById('custContact').value = '';
+        document.getElementById('custAddress').value = '';
+        document.getElementById('custNotes').value = '';
+        document.getElementById('custPaymentStatus').value = '';
+        document.querySelectorAll('#paymentOptions .payment-option').forEach(o => o.classList.remove('selected'));
+        document.querySelectorAll('#orderTypeToggle .type-option').forEach(o => o.classList.remove('selected'));
+        document.querySelector('#orderTypeToggle .type-option[data-type="Delivery"]').classList.add('selected');
+        document.getElementById('addressGroup').style.display = '';
+        document.getElementById('detailsTitle').textContent = 'DELIVERY DETAILS';
+        document.getElementById('custAddress').placeholder = 'Delivery address';
+        document.getElementById('receiptOverlay').classList.remove('open');
+
+        window.location.href = '/deliveries';
+    } catch (err) {
+        console.error('POS sale failed:', err);
+        alert('Could not reach the server. Please try again.');
+        confirmBtn.disabled = false;
     }
-
-    // reset POS state
-    cart = [];
-    pendingOrder = null;
-    selectedPayment = null;
-    orderType = 'Delivery';
-    document.getElementById('custName').value = '';
-    document.getElementById('custContact').value = '';
-    document.getElementById('custAddress').value = '';
-    document.getElementById('custNotes').value = '';
-    document.getElementById('custPaymentStatus').value = '';
-    document.querySelectorAll('#paymentOptions .payment-option').forEach(o => o.classList.remove('selected'));
-    document.querySelectorAll('#orderTypeToggle .type-option').forEach(o => o.classList.remove('selected'));
-    document.querySelector('#orderTypeToggle .type-option[data-type="Delivery"]').classList.add('selected');
-    document.getElementById('addressGroup').style.display = '';
-    document.getElementById('detailsTitle').textContent = 'DELIVERY DETAILS';
-    document.getElementById('custAddress').placeholder = 'Delivery address';
-    document.getElementById('receiptOverlay').classList.remove('open');
-
-    // hand off to Delivery Ops
-    window.location.href = "{{ url('/deliveries') }}";
 });
 
 /* ---------------- INIT ---------------- */

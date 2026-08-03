@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Models\Dispatch;
 use App\Models\OrderItem;
+use App\Models\Truck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,12 +14,13 @@ class DispatchController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
-    {
-        return Dispatch::query()
-            ->with('truck', 'drivers', 'orderItem.product', 'delivery')
-            ->latest('DispatchDate')
+    public function index(){
+            $orders = OrderItem::whereRaw('CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatch WHERE dispatch.OrderItemID = order_items.OrderItemID)') // your unassignedItems() logic
+            ->with('product', 'order')
             ->get();
+        $trucks = Truck::with('dispatches.orderItem.order')->get();
+
+        return view('deliveries.index', compact('orders', 'trucks'));
     }
 
     /**
@@ -35,7 +38,7 @@ class DispatchController extends Controller
          $validated = $request->validate([
             'OrderItemID' => 'required|exists:order_items,OrderItemID',
             'TruckID' => 'required|exists:trucks,TruckID',
-            'QuantityDispatched' => 'required|integer|min:1',
+            'QuantityDispatched' => 'required|numeric|min:1',
             'DispatchDate' => 'required|date',
             'drivers' => 'required|array|min:1',
             'drivers.*.DriverID' => 'required|exists:drivers,DriverID',
@@ -120,4 +123,10 @@ class DispatchController extends Controller
         $dispatch->truck()->update(['Status' => 'Available']);
         return $dispatch;
     }
+    public function unassignedItems()
+{
+    return OrderItem::whereRaw(
+        'CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatch WHERE dispatch.OrderItemID = order_items.OrderItemID)'
+    )->with('product', 'order')->get();
+}
 }

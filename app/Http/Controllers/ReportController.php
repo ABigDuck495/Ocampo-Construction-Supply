@@ -13,7 +13,9 @@ class ReportController extends Controller
      */
     public function index()
     {
-        return Report::query()->latest('ReportDate')->get();
+        return view('reports.index', [
+            'reports' => Report::latest('ReportDate')->paginate(20),
+        ]);
     }
 
     /**

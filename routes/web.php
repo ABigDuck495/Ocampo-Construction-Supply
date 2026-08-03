@@ -44,6 +44,8 @@ Route::get('/pos', [PosController::class, 'index'])->name('pos.index'); ////////
 
 Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:Admin,Staff'])->group(function () {
+        Route::post('dispatches/{dispatch}/deliveries', [DeliveryController::class, 'store'])->name('deliveries.storeForDispatch');
+        Route::get('dispatches/unassigned', [DispatchController::class, 'unassignedItems'])->name('dispatches.unassigned');
         Route::resource('products', ProductController::class);
         Route::resource('inventories', InventoryController::class);
         Route::resource('orders', OrderController::class);
@@ -55,9 +57,8 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('trucks', TruckController::class);
         Route::resource('transactions', TransactionController::class);
         Route::resource('reports', ReportController::class);
-        Route::get('pos', function () {
-            return view('pos.index');
-        })->name('pos.index');
+        Route::resource('users', UserController::class);
+        Route::resource('pos', PosController::class);
 
         Route::get('products/search', [ProductController::class, 'search']);
         Route::get('products/top-selling', [ProductController::class, 'topSelling']);

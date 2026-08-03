@@ -1,26 +1,71 @@
 /* ============================================================
-   DELIVERY OPS - DATA + LOGIC
+   DELIVERY OPS - DATA + LOGIC (wired to backend)
    ============================================================ */
 
-/* ---------------- DATA ---------------- */
-let orders = [
-    { id:'RC-041823', customer:'Juan dela Cruz', contact:'0917 234 5671', address:'123 Magsaysay St, Brgy. San Jose', notes:'', orderType:'Delivery',
-      items:[{name:'Titanium Hammer',qty:2},{name:'Hex Bolt M8 x50',qty:5}], total:85.58, payment:'COD', paymentStatus:'Unpaid', status:'transit', truck:'T1' },
-    { id:'RC-041891', customer:'Maria Santos', contact:'0918 345 6782', address:'45 Rizal Ave, Brgy. Poblacion', notes:'Leave with the guard if no one answers.', orderType:'Delivery',
-      items:[{name:'PVC Pipe 3/4"',qty:5},{name:'Circuit Breaker 20A',qty:2}], total:52.08, payment:'GCash', paymentStatus:'Paid', status:'pending', truck:null },
-    { id:'RC-041956', customer:'Pedro Reyes', contact:'0919 456 7893', address:'789 Luna St, Brgy. Sta. Cruz', notes:'', orderType:'Delivery',
-      items:[{name:'Cordless Drill 18V',qty:1},{name:'Safety Gloves L',qty:2}], total:64.30, payment:'Card', paymentStatus:'Paid', status:'transit', truck:'T2' },
-    { id:'RC-042004', customer:'Ana Lopez', contact:'0920 567 8904', address:'12 Bonifacio St, Brgy. San Jose', notes:'', orderType:'Delivery',
-      items:[{name:'Paint Roller Set',qty:3},{name:'Latex Paint 1L',qty:4}], total:47.15, payment:'Bank Transfer', paymentStatus:'Paid', status:'pending', truck:null },
-    { id:'RC-042017', customer:'Carlo Dizon', contact:'0921 678 9015', address:'Pickup at store', notes:'Will pick up after 5pm.', orderType:'Pickup',
-      items:[{name:'Steel Nails 1kg',qty:6}], total:18.90, payment:'COD', paymentStatus:'Unpaid', status:'pending', truck:null },
-];
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
-let trucks = [
-    { id:'T1', name:'Ironclad 01', driver:'Ben Santos', plate:'ABC-1234', capacity:30, status:'loading', departed:null },
-    { id:'T2', name:'Ironclad 02', driver:'Mia Cruz', plate:'DEF-5678', capacity:25, status:'transit', departed:'Jul 23, 2026, 9:10 AM' },
-    { id:'T3', name:'Ironclad 03', driver:'Jake Reyes', plate:'GHI-9012', capacity:20, status:'idle', departed:null },
-];
+/* ---------------- DATA (from DispatchController@index) ----------------
+   window.DISPATCH_DATA.orders  -> flat OrderItem[] still awaiting dispatch
+   window.DISPATCH_DATA.trucks  -> Truck[] with .dispatches (active ones with .orderItem.order, .drivers)
+   ------------------------------------------------------------------- */
+const rawOrderItems = (window.DISPATCH_DATA && window.DISPATCH_DATA.orders) || [];
+const rawTrucks = (window.DISPATCH_DATA && window.DISPATCH_DATA.trucks) || [];
+
+/* Group flat OrderItems (one row per product) into order cards
+   (one card per Order, matching the original UI design). */
+function groupOrderItems(items){
+    const map = {};
+    items.forEach(oi => {
+        const oid = oi.OrderID;
+        if(!map[oid]){
+            const isPickup = oi.order && oi.order.OrderType === 'Pickup';
+            map[oid] = {
+                id: 'ORD-' + oid,
+                orderId: oid,
+                customer: oi.order?.CustomerName || 'Unknown',
+                contact: oi.order?.ContactNumber || '',
+                address: oi.order?.Address || (isPickup ? 'Pickup at store' : ''),
+                notes: oi.order?.Notes || '',
+                orderType: isPickup ? 'Pickup' : 'Delivery',
+                paymentStatus: oi.order?.PaymentStatus || '',
+                total: 0, // not priced at this stage - Product has no stored price yet
+                items: [],
+                orderItemIds: [],
+                status: 'pending',
+                truck: null,
+            };
+        }
+        map[oid].items.push({ name: oi.product?.Product_Name || 'Item', qty: oi.Quantity, orderItemId: oi.OrderItemID });
+        map[oid].orderItemIds.push(oi.OrderItemID);
+    });
+    return Object.values(map);
+}
+
+/* Map backend Truck + active Dispatch rows into the board's truck shape */
+function mapTrucks(list){
+    return list.map(t => {
+        const activeDispatches = (t.dispatches || []).filter(d => d.Status === 'On Route');
+        const mainDriver = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Main');
+
+        let status = 'idle';
+        if (t.Status === 'On Route') status = 'transit';
+        else if (t.Status === 'Maintenance') status = 'maintenance';
+
+        return {
+            id: t.TruckID,
+            name: t.TruckName,
+            driver: mainDriver?.Name || '—',
+            plate: t.Plate_Number,
+            capacity: Number(t.Capacity) || 0,
+            status: status,
+            departed: activeDispatches[0]?.DispatchDate || null,
+            activeDispatchIds: activeDispatches.map(d => d.DispatchID),
+        };
+    });
+}
+
+let orders = groupOrderItems(rawOrderItems);
+let trucks = mapTrucks(rawTrucks);
 
 let activeTab = 'all';
 let dragOrderId = null;
@@ -37,8 +82,8 @@ const svg = {
     note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>',
 };
 
-function fmt(n){ return '$' + n.toFixed(2); }
-function cargoOf(order){ return order.items.reduce((s,i)=>s+i.qty,0); }
+function fmt(n){ return '$' + Number(n || 0).toFixed(2); }
+function cargoOf(order){ return order.items.reduce((s,i)=>s + (parseFloat(i.qty) || 0), 0); }
 function truckCargo(truck){
     return orders.filter(o=>o.truck===truck.id).reduce((s,o)=>s+cargoOf(o),0);
 }
@@ -54,7 +99,6 @@ function renderStats(){
     const transit = orders.filter(o=>o.status==='transit').length;
     const assigned = orders.filter(o=>o.status==='assigned').length;
     const delivered = orders.filter(o=>o.status==='delivered').length;
-    const returned = orders.filter(o=>o.status==='returned').length;
 
     document.getElementById('statPending').textContent = pending;
     document.getElementById('statTransit').textContent = transit;
@@ -76,21 +120,18 @@ function renderStats(){
 
 function badgeFor(status){
     const map = {pending:'PENDING', transit:'TRANSIT', assigned:'PARTIAL', delivered:'DELIVERED', returned:'RETURNED'};
-    return `<span class="badge ${status}">${map[status]}</span>`;
+    return `<span class="badge ${status}">${map[status] || status}</span>`;
 }
-
 function badgeForPayment(payment){
     if(!payment) return '';
     const cls = payment.toLowerCase().replace(/\s+/g, '-');
     return `<span class="badge payment-${cls}">${payment}</span>`;
 }
-
 function badgeForPaymentStatus(paymentStatus){
     if(!paymentStatus) return '';
     const cls = paymentStatus.toLowerCase();
     return `<span class="badge status-${cls}">${paymentStatus}</span>`;
 }
-
 function badgeForOrderType(orderType){
     if(orderType !== 'Pickup') return '';
     return `<span class="badge pickup">PICKUP</span>`;
@@ -134,7 +175,6 @@ function renderOrderList(){
         </div>`;
     }).join('');
 
-    // attach drag events
     list.querySelectorAll('.order-card[draggable="true"]').forEach(card=>{
         card.addEventListener('dragstart', e=>{
             dragOrderId = card.dataset.order;
@@ -150,35 +190,23 @@ function renderTrucks(){
         const assignedOrders = orders.filter(o=>o.truck===truck.id && o.status!=='delivered' && o.status!=='returned');
         const cargo = truckCargo(truck);
         const segCount = 10;
-        const filledSegs = Math.round((cargo/truck.capacity)*segCount);
+        const filledSegs = truck.capacity ? Math.round((cargo/truck.capacity)*segCount) : 0;
 
         let statusBadgeClass = truck.status==='loading' ? 'pending' : truck.status==='transit' ? 'transit' : truck.status==='idle' ? '' : 'delivered';
         let statusLabel = truck.status.toUpperCase();
 
-        let ordersHtml = assignedOrders.length ? assignedOrders.map(o=>`
-            <div class="tc-order" data-order="${o.id}">
-                <div class="tc-order-top">
-                    <span class="tc-order-id">${o.id}</span>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        ${badgeForPayment(o.payment)}
-                        ${badgeForPaymentStatus(o.paymentStatus)}
-                        <button class="icon-btn" onclick="viewReceipt('${o.id}')" title="View">${svg.eye}</button>
-                        ${truck.status==='loading' ? `<button class="icon-btn danger" onclick="unassign('${o.id}')" title="Remove">${svg.x}</button>` : ''}
-                    </div>
-                </div>
-                <div class="tc-order-name">${o.customer}</div>
-                <div class="tc-order-items">
-                    ${o.items.map(i=>`<div><span>${i.name}</span><span>x${i.qty}</span></div>`).join('')}
-                    <div style="color:var(--text-faint);margin-top:2px;">${o.items.length} item${o.items.length>1?'s':''}</div>
-                </div>
-            </div>`).join('') : `<div class="dropzone-empty">${truck.status==='idle' ? 'NO CARGO ASSIGNED' : 'DRAG A RECEIPT HERE'}</div>`;
+        const ordersHtml = assignedOrders.map(o => `
+            <div class="tc-order-row">
+                <span>${o.id} &middot; ${o.customer}</span>
+                ${truck.status==='loading' ? `<button class="tc-unassign" onclick="unassign('${o.id}')" title="Unassign">${svg.x}</button>` : ''}
+            </div>`).join('');
 
         let actionsHtml = '';
         if(truck.status==='loading'){
             actionsHtml = `
                 <div class="tc-actions">
-                    <button class="btn btn-dispatch" onclick="dispatchTruck('${truck.id}')" ${assignedOrders.length===0?'disabled style="opacity:.4;cursor:not-allowed;"':''}>${svg.arrow} DISPATCH</button>
-                    <button class="btn btn-cancel" onclick="clearTruck('${truck.id}')" title="Clear all">${svg.x}</button>
+                    <button class="btn btn-dispatch" onclick="dispatchTruck('${truck.id}')">${svg.arrow} DISPATCH</button>
+                    <button class="btn-ghost" onclick="clearTruck('${truck.id}')">CLEAR</button>
                 </div>`;
         } else if(truck.status==='transit'){
             actionsHtml = `
@@ -186,7 +214,7 @@ function renderTrucks(){
                     <button class="btn btn-delivered" onclick="markDelivered('${truck.id}')">${svg.check} MARK DELIVERED</button>
                     <button class="btn btn-return" onclick="markReturned('${truck.id}')" title="No one claimed it">${svg.back}</button>
                 </div>
-                <div class="tc-departed">DEPARTED: ${truck.departed}</div>`;
+                <div class="tc-departed">DEPARTED: ${truck.departed || ''}</div>`;
         }
 
         return `
@@ -208,10 +236,9 @@ function renderTrucks(){
         </div>`;
     }).join('');
 
-    // dropzones = truck cards themselves (except transit/delivered trucks accept no new drops)
     grid.querySelectorAll('.truck-card').forEach(card=>{
         const truckId = card.dataset.truck;
-        const truck = trucks.find(t=>t.id===truckId);
+        const truck = trucks.find(t=>String(t.id)===String(truckId));
         if(truck.status !== 'loading' && truck.status !== 'idle') return;
 
         card.addEventListener('dragover', e=>{
@@ -229,9 +256,11 @@ function renderTrucks(){
 }
 
 /* ---------------- ACTIONS ---------------- */
+
+// Purely client-side staging - no Dispatch record exists yet until dispatchTruck() runs.
 function assignOrder(orderId, truckId){
     const order = orders.find(o=>o.id===orderId);
-    const truck = trucks.find(t=>t.id===truckId);
+    const truck = trucks.find(t=>String(t.id)===String(truckId));
     if(!order || !truck) return;
 
     const currentCargo = truckCargo(truck);
@@ -251,7 +280,6 @@ function unassign(orderId){
     if(!order) return;
     order.truck = null;
     order.status = 'pending';
-    // if truck now has zero cargo, revert to idle
     trucks.forEach(t=>{
         if(t.status==='loading' && truckCargo(t)===0) t.status = 'idle';
     });
@@ -259,45 +287,133 @@ function unassign(orderId){
 }
 
 function clearTruck(truckId){
-    orders.filter(o=>o.truck===truckId).forEach(o=>{ o.truck=null; o.status='pending'; });
-    const truck = trucks.find(t=>t.id===truckId);
+    orders.filter(o=>String(o.truck)===String(truckId)).forEach(o=>{ o.truck=null; o.status='pending'; });
+    const truck = trucks.find(t=>String(t.id)===String(truckId));
     truck.status = 'idle';
     render();
 }
 
-function dispatchTruck(truckId){
-    const truck = trucks.find(t=>t.id===truckId);
-    const assigned = orders.filter(o=>o.truck===truckId);
+// Picks one available driver as "Main" for this dispatch, since the UI has no driver picker.
+async function pickDriverForDispatch(){
+    try {
+        const res = await fetch('/drivers/available');
+        if(!res.ok) return null;
+        const drivers = await res.json();
+        return drivers[0]?.DriverID || null;
+    } catch (err) {
+        console.error('Could not fetch available drivers:', err);
+        return null;
+    }
+}
+
+// Real dispatch - creates one Dispatch record per OrderItem assigned to this truck.
+async function dispatchTruck(truckId){
+    const truck = trucks.find(t=>String(t.id)===String(truckId));
+    const assigned = orders.filter(o=>String(o.truck)===String(truckId));
     if(!assigned.length) return;
-    truck.status = 'transit';
-    truck.departed = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
-    assigned.forEach(o=> o.status = 'transit');
-    render();
+
+    const driverId = await pickDriverForDispatch();
+    if(!driverId){
+        alert('No available drivers to assign to this dispatch.');
+        return;
+    }
+
+    const dispatchDate = new Date().toISOString().split('T')[0];
+
+    try {
+        for (const order of assigned) {
+            for (const item of order.items) {
+                const res = await fetch('/dispatches', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        OrderItemID: item.orderItemId,
+                        TruckID: truckId,
+                        QuantityDispatched: parseFloat(item.qty) || 1,
+                        DispatchDate: dispatchDate,
+                        drivers: [{ DriverID: driverId, Role: 'Main' }],
+                    }),
+                });
+
+                if(!res.ok){
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.message || `Failed to dispatch item for order ${order.id}`);
+                }
+            }
+        }
+
+        // Reload to get fresh truth from the server (real Dispatch/Truck statuses).
+        window.location.reload();
+    } catch (err) {
+        console.error('Dispatch failed:', err);
+        alert(err.message || 'Something went wrong while dispatching.');
+    }
 }
 
-function markDelivered(truckId){
-    const truck = trucks.find(t=>t.id===truckId);
-    orders.filter(o=>o.truck===truckId).forEach(o=>{ o.status='delivered'; });
-    truck.status = 'delivered';
-    render();
-    setTimeout(()=>{ resetTruck(truckId); }, 1600);
+// Confirms delivery for every active Dispatch currently on this truck.
+async function markDelivered(truckId){
+    const truck = trucks.find(t=>String(t.id)===String(truckId));
+    if(!truck || !truck.activeDispatchIds.length) return;
+
+    try {
+        for (const dispatchId of truck.activeDispatchIds) {
+            const res = await fetch(`/dispatches/${dispatchId}/deliveries`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    QuantityDelivered: 0, // backend uses the dispatched quantity; adjust here if partials matter
+                    Status: 'Delivered',
+                }),
+            });
+            if(!res.ok){
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to confirm delivery.');
+            }
+        }
+        window.location.reload();
+    } catch (err) {
+        console.error('Mark delivered failed:', err);
+        alert(err.message || 'Something went wrong confirming delivery.');
+    }
 }
 
-function markReturned(truckId){
-    const truck = trucks.find(t=>t.id===truckId);
-    orders.filter(o=>o.truck===truckId).forEach(o=>{ o.status='returned'; });
-    truck.status = 'delivered'; // back at base, unclaimed load returned
-    render();
-    setTimeout(()=>{ resetTruck(truckId); }, 1600);
-}
+// Confirms a failed/returned delivery for every active Dispatch on this truck.
+async function markReturned(truckId){
+    const truck = trucks.find(t=>String(t.id)===String(truckId));
+    if(!truck || !truck.activeDispatchIds.length) return;
 
-function resetTruck(truckId){
-    const truck = trucks.find(t=>t.id===truckId);
-    // detach delivered/returned orders from truck view, free the truck up
-    orders.forEach(o=>{ if(o.truck===truckId) o.truck = null; });
-    truck.status = 'idle';
-    truck.departed = null;
-    render();
+    try {
+        for (const dispatchId of truck.activeDispatchIds) {
+            const res = await fetch(`/dispatches/${dispatchId}/deliveries`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    QuantityDelivered: 0,
+                    Status: 'Returned',
+                }),
+            });
+            if(!res.ok){
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to mark as returned.');
+            }
+        }
+        window.location.reload();
+    } catch (err) {
+        console.error('Mark returned failed:', err);
+        alert(err.message || 'Something went wrong marking the return.');
+    }
 }
 
 function viewReceipt(orderId){
@@ -306,7 +422,7 @@ function viewReceipt(orderId){
     const lines = o.items.map(i=>`  ${i.name} x${i.qty}`).join('\n');
     const notesLine = o.notes ? `\nNotes: ${o.notes}` : '';
     const addressLine = o.orderType === 'Pickup' ? '' : `\n${o.address}`;
-    alert(`RECEIPT ${o.id}\n${o.customer}\nContact: ${o.contact || 'N/A'}\nType: ${o.orderType || 'Delivery'}${addressLine}${notesLine}\nPayment: ${o.payment || 'N/A'} (${o.paymentStatus || 'N/A'})\n\n${lines}\n\nTOTAL: ${fmt(o.total)}`);
+    alert(`RECEIPT ${o.id}\n${o.customer}\nContact: ${o.contact || 'N/A'}\nType: ${o.orderType || 'Delivery'}${addressLine}${notesLine}\nPayment status: ${o.paymentStatus || 'N/A'}\n\n${lines}`);
 }
 
 /* ---------------- TABS ---------------- */
@@ -321,12 +437,7 @@ document.getElementById('tabs').addEventListener('click', e=>{
 
 render();
 
-/* ---------------- EXPOSE TO GLOBAL SCOPE ----------------
-   Required because Vite loads this file as an ES module.
-   Module-scoped functions are NOT automatically attached to
-   `window`, but the inline onclick="..." attributes in the
-   HTML strings above need them there to be callable.
-*/
+/* ---------------- EXPOSE TO GLOBAL SCOPE ---------------- */
 window.viewReceipt = viewReceipt;
 window.unassign = unassign;
 window.clearTruck = clearTruck;
