@@ -12,7 +12,9 @@ class UserController extends Controller
      */
     public function index()
     {
-        return User::query()->latest('UserID')->get();
+        return view('users.index', [
+            'users' => User::all(),
+        ]);
     }
 
     /**

@@ -6,6 +6,14 @@ export default defineConfig({
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/pt210-printer.js'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+                'resources/css/sidebar.css',
+                'resources/css/deliveries.css',
+                'resources/js/pages/deliveries.js',
+                'resources/js/pages/sidebar.js',
+            ],
             refresh: true,
         }),
         tailwindcss(),

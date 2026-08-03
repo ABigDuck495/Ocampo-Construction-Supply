@@ -26,28 +26,35 @@
         </div>
     </div>
     <nav class="nav">
-        <a href="{{ route('pos.index') }}" class="nav-item"><span class="lbl">
+        <a class="nav-item"><span class="lbl">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="1"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
             POS</span></a>
-        <a href="{{ route('deliveries.index') }}" class="nav-item active"><span class="lbl">
+        <a class="nav-item active"><span class="lbl">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="17.5" cy="19" r="1.5"/></svg>
             DELIVERY</span><span class="nav-badge" id="sidebarBadge">5</span></a>
-         <a href="{{ route('reports.index') }}" class="nav-item"><span class="lbl">
+        <a class="nav-item"><span class="lbl">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
             REPORTS</span></a>
-         <a href="{{ route('users.index') }}" class="nav-item"><span class="lbl">
+        <a class="nav-item"><span class="lbl">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15 20a5 5 0 0 1 8 0"/></svg>
             USERS</span></a>
     </nav>
 
-   <div class="sidebar-footer">
+    <div class="sidebar-footer">
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark mode">
             <span class="theme-toggle-icon" id="themeIcon">
+                <!-- moon (shown in dark mode) -->
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </span>
             <span class="theme-toggle-label" id="themeLabel">DARK MODE</span>
         </button>
 
+        <!-- If you have a named logout route with POST + CSRF, swap this for a form:
+             <form method="POST" action="{{ route('logout') }}">
+                 @csrf
+                 <button type="submit" class="signout-btn">...</button>
+             </form>
+        -->
         <a href="{{ url('/login') }}" class="signout-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
             SIGN OUT

@@ -55,9 +55,9 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('trucks', TruckController::class);
         Route::resource('transactions', TransactionController::class);
         Route::resource('reports', ReportController::class);
-        // Route::get('/pos', function () {
-        //     return view('pos');
-        // })->name('pos.index');
+        Route::get('pos', function () {
+            return view('pos.index');
+        })->name('pos.index');
 
         Route::get('products/search', [ProductController::class, 'search']);
         Route::get('products/top-selling', [ProductController::class, 'topSelling']);

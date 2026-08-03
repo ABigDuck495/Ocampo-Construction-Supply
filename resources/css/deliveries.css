@@ -1,0 +1,232 @@
+/* ============================================================
+   ROOT VARIABLES + BASE
+   ============================================================ */
+:root{
+    --bg:#0a0c11;
+    --panel:#11141c;
+    --panel-alt:#161a24;
+    --border:#262b38;
+    --border-hard:#000;
+    --text:#e9e7df;
+    --text-dim:#7b8296;
+    --text-faint:#4d5265;
+    --orange:#f5a623;
+    --orange-dark:#c9840f;
+    --orange-glow:rgba(245,166,35,.35);
+    --blue:#4d9eff;
+    --blue-dark:#1c5fc4;
+    --green:#3fd15a;
+    --green-dark:#1f8c39;
+    --red:#ff5c5c;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'JetBrains Mono', ui-monospace, monospace;
+    min-height:100vh;
+    display:flex;
+}
+
+/* ============================================================
+   MAIN CONTENT (DELIVERY OPS)
+   ============================================================ */
+.main{flex:1;min-width:0;padding:20px 24px 40px;}
+
+.header{
+    position:relative;
+    background:var(--orange);
+    background-image:radial-gradient(rgba(0,0,0,.14) 1.5px, transparent 1.5px);
+    background-size:9px 9px;
+    border:2px solid #000;
+    box-shadow:3px 3px 0 #000;
+    padding:20px 24px;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    margin-bottom:18px;
+    color:#1a1305;
+}
+.header h1{
+    margin:0 0 6px;
+    font-size:22px;
+    font-weight:800;
+    letter-spacing:.03em;
+}
+.header p{margin:0;font-size:12px;font-weight:600;opacity:.75;}
+.header-stats{display:flex;gap:22px;}
+.hstat{text-align:center;}
+.hstat b{display:block;font-size:22px;font-weight:800;color:#fff;text-shadow:1px 1px 0 #000;}
+.hstat span{font-size:9px;font-weight:700;letter-spacing:.05em;opacity:.8;}
+
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.tab{
+    background:var(--panel);
+    border:2px solid var(--border);
+    color:var(--text-dim);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.04em;
+    padding:8px 14px;
+    cursor:pointer;
+    user-select:none;
+}
+.tab.active{background:#fff;color:#111;border-color:#000;box-shadow:2px 2px 0 #000;}
+.hint{font-size:10px;color:var(--text-faint);letter-spacing:.08em;margin-bottom:12px;font-weight:600;text-transform:uppercase;}
+
+.board{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start;}
+
+/* ---------- ORDER LIST ---------- */
+.order-list{display:flex;flex-direction:column;gap:12px;}
+.order-card{
+    background:var(--panel);
+    border:2px solid var(--border);
+    padding:14px;
+    cursor:grab;
+    position:relative;
+}
+.order-card[draggable="true"]:active{cursor:grabbing;}
+.order-card.dragging{opacity:.4;}
+.order-card.is-assigned{border-color:var(--orange-dark);}
+.oc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.oc-id{font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+.oc-id .grip{color:var(--text-faint);letter-spacing:2px;}
+.badge{
+    font-size:9px;font-weight:800;letter-spacing:.05em;
+    padding:2px 7px;border:1px solid currentColor;
+}
+.badge.pending{color:var(--orange);}
+.badge.transit{color:var(--blue);}
+.badge.assigned{color:#c98bff;}
+.badge.delivered{color:var(--green);}
+.badge.returned{color:var(--red);}
+.badge.zone-north{color:var(--blue);}
+.badge.zone-south{color:var(--orange);}
+.badge.pickup{color:#c98bff;}
+.oc-badges-top{display:flex;align-items:center;gap:6px;}
+
+/* ---------- PAYMENT METHOD BADGES ---------- */
+.badge.payment-cod{color:var(--red);}
+.badge.payment-gcash{color:var(--blue);}
+.badge.payment-card{color:#c98bff;}
+.badge.payment-bank-transfer{color:var(--green);}
+
+/* ---------- PAYMENT STATUS BADGES ---------- */
+.badge.status-paid{color:var(--green);}
+.badge.status-unpaid{color:var(--red);}
+
+.oc-name{font-size:15px;font-weight:800;margin:2px 0 8px;}
+.oc-contact,.oc-addr,.oc-notes{font-size:10.5px;color:var(--text-dim);display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.oc-contact svg,.oc-addr svg,.oc-notes svg{width:12px;height:12px;flex-shrink:0;}
+.oc-addr{margin-bottom:10px;}
+.oc-notes{margin-bottom:10px;color:var(--text-faint);font-style:italic;}
+.oc-items{background:var(--panel-alt);border:1px solid var(--border);padding:8px 10px;margin-bottom:10px;}
+.oc-item-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--text);}
+.oc-item-row span.qty{color:var(--text-dim);}
+.oc-bottom{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.oc-price{color:var(--orange);font-weight:800;font-size:14px;}
+.oc-badges{display:flex;align-items:center;gap:6px;}
+.oc-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.btn-ghost{
+    background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    font-size:9.5px;font-weight:700;padding:5px 9px;letter-spacing:.04em;cursor:pointer;
+}
+.btn-ghost:hover{color:var(--text);border-color:var(--text-dim);}
+.drag-hint{font-size:9px;color:var(--text-faint);letter-spacing:.04em;}
+.oc-assigned-tag{font-size:9.5px;color:var(--orange-dark);font-weight:700;margin-top:8px;}
+
+/* ---------- TRUCK FLEET ---------- */
+.fleet-panel{background:transparent;}
+.fleet-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 4px 14px;
+    border-bottom:2px solid var(--border);
+    margin-bottom:14px;
+}
+.fleet-title{font-size:13px;font-weight:800;letter-spacing:.06em;color:var(--text);}
+.fleet-stats{display:flex;gap:18px;}
+.fstat{text-align:center;}
+.fstat b{display:block;font-size:15px;font-weight:800;}
+.fstat span{font-size:8.5px;color:var(--text-dim);letter-spacing:.04em;}
+.fstat.idle b{color:var(--text-dim);}
+.fstat.loading b{color:var(--orange);}
+.fstat.transit b{color:var(--blue);}
+.fstat.delivered b{color:var(--green);}
+
+.truck-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media (max-width: 900px){.truck-grid{grid-template-columns:1fr;} .board{grid-template-columns:1fr;}}
+
+.truck-card{
+    background:var(--panel);
+    border:2px solid var(--border);
+    padding:14px;
+    display:flex;flex-direction:column;gap:10px;
+    transition:border-color .15s ease;
+}
+.truck-card.drop-active{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange-glow);}
+.tc-top{display:flex;align-items:center;justify-content:space-between;}
+.tc-name{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;}
+.tc-name svg{width:15px;height:15px;color:var(--text-dim);}
+.tc-driver{font-size:10.5px;color:var(--text-dim);margin-top:1px;}
+
+.cargo-label{display:flex;justify-content:space-between;font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-dim);margin-bottom:4px;}
+.cargo-label b{color:var(--orange);}
+.cargo-bar{display:flex;gap:2px;height:14px;}
+.cargo-seg{flex:1;background:var(--panel-alt);border:1px solid var(--border);}
+.cargo-seg.filled{background:var(--green);border-color:#000;}
+
+.tc-orders{display:flex;flex-direction:column;gap:8px;min-height:10px;}
+.tc-order{
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    padding:8px 10px;
+}
+.tc-order-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.tc-order-id{font-size:10.5px;color:var(--text-dim);}
+.tc-order-name{font-size:12px;font-weight:700;margin-bottom:4px;}
+.tc-order-items{font-size:10px;color:var(--text-dim);}
+.tc-order-items div{display:flex;justify-content:space-between;padding:1px 0;}
+.icon-btn{
+    background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.icon-btn:hover{color:var(--text);border-color:var(--text-dim);}
+.icon-btn svg{width:11px;height:11px;}
+.icon-btn.danger:hover{color:var(--red);border-color:var(--red);}
+
+.dropzone-empty{
+    border:1.5px dashed var(--border);
+    text-align:center;
+    padding:14px 8px;
+    font-size:9.5px;
+    color:var(--text-faint);
+    letter-spacing:.04em;
+}
+
+.tc-actions{display:flex;gap:8px;}
+.btn{
+    flex:1;
+    border:2px solid #000;
+    font-weight:800;
+    font-size:11.5px;
+    letter-spacing:.03em;
+    padding:10px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    cursor:pointer;
+    box-shadow:2px 2px 0 #000;
+    transition:transform .1s ease, filter .1s ease;
+}
+.btn:hover{filter:brightness(1.08);}
+.btn:active{transform:translate(2px,2px);box-shadow:0 0 0 #000;}
+.btn svg{width:13px;height:13px;}
+.btn-dispatch{background:var(--blue);color:#fff;}
+.btn-delivered{background:var(--green);color:#08210d;}
+.btn-return{background:transparent;color:var(--red);border-color:var(--red);box-shadow:2px 2px 0 var(--red);flex:0 0 auto;padding:10px 12px;}
+.btn-cancel{background:var(--panel-alt);color:var(--text-dim);flex:0 0 auto;padding:10px 12px;}
+
+.tc-departed{font-size:9px;color:var(--text-faint);text-align:center;letter-spacing:.04em;}
+
+.empty-state{font-size:11px;color:var(--text-faint);text-align:center;padding:30px 0;letter-spacing:.03em;}
+    
