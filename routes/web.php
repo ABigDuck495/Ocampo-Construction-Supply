@@ -16,6 +16,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController as LoginController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\PosController;
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -37,6 +38,9 @@ Route::prefix('auth')->group(function () {
         Route::get('me', [AuthController::class, 'me'])->name('auth.me');
     });
 });
+
+Route::get('/pos', [PosController::class, 'index'])->name('pos.index'); ///////////////tanggalin 
+
 
 Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:Admin,Staff'])->group(function () {
