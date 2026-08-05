@@ -11,38 +11,42 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 const rawOrderItems = (window.DISPATCH_DATA && window.DISPATCH_DATA.orders) || [];
 const rawTrucks = (window.DISPATCH_DATA && window.DISPATCH_DATA.trucks) || [];
 
-/* Group flat OrderItems (one row per product) into order cards
-   (one card per Order, matching the original UI design). */
-function groupOrderItems(items){
+function groupOrderItems(items) {
     const map = {};
     items.forEach(oi => {
         const oid = oi.OrderID;
-        if(!map[oid]){
-            const isPickup = oi.order && oi.order.OrderType === 'Pickup';
+        if (!map[oid]) {
+            const order = oi.order || {};
+            // OrderType does not exist – default to 'Delivery'
+            const isPickup = false; // or derive from some flag if you add it later
             map[oid] = {
                 id: 'ORD-' + oid,
                 orderId: oid,
-                customer: oi.order?.CustomerName || 'Unknown',
-                contact: oi.order?.ContactNumber || '',
-                address: oi.order?.Address || (isPickup ? 'Pickup at store' : ''),
-                notes: oi.order?.Notes || '',
+                customer: order.CustomerName || 'Unknown',
+                contact: order.ContactNumber || '',
+                address: order.Address || (isPickup ? 'Pickup at store' : ''),
+                notes: order.Notes || '',
                 orderType: isPickup ? 'Pickup' : 'Delivery',
-                paymentStatus: oi.order?.PaymentStatus || '',
-                total: 0, // not priced at this stage - Product has no stored price yet
+                paymentStatus: order.PaymentStatus || '',
+                total: 0,
                 items: [],
                 orderItemIds: [],
                 status: 'pending',
                 truck: null,
             };
         }
-        map[oid].items.push({ name: oi.product?.Product_Name || 'Item', qty: oi.Quantity, orderItemId: oi.OrderItemID });
+        const product = oi.product || {};
+        map[oid].items.push({
+            name: product.Product_Name || 'Item',
+            qty: oi.Quantity,
+            orderItemId: oi.OrderItemID,
+        });
         map[oid].orderItemIds.push(oi.OrderItemID);
     });
     return Object.values(map);
 }
 
-/* Map backend Truck + active Dispatch rows into the board's truck shape */
-function mapTrucks(list){
+function mapTrucks(list) {
     return list.map(t => {
         const activeDispatches = (t.dispatches || []).filter(d => d.Status === 'On Route');
         const mainDriver = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Main');
@@ -55,7 +59,7 @@ function mapTrucks(list){
             id: t.TruckID,
             name: t.TruckName,
             driver: mainDriver?.Name || '—',
-            plate: t.Plate_Number,
+            plate: t.PlateNumber,           // ← fixed field name
             capacity: Number(t.Capacity) || 0,
             status: status,
             departed: activeDispatches[0]?.DispatchDate || null,
@@ -103,7 +107,13 @@ function renderStats(){
     document.getElementById('statPending').textContent = pending;
     document.getElementById('statTransit').textContent = transit;
     document.getElementById('statDone').textContent = delivered;
-    document.getElementById('headerSub').textContent = `${orders.length} orders · ${trucks.length} trucks`;
+
+    const headerSub = document.getElementById('headerSub');
+    if (headerSub) {
+        const customText = headerSub.dataset.defaultText?.trim();
+        headerSub.textContent = customText || `${orders.length} orders · ${trucks.length} trucks`;
+    }
+
     document.getElementById('sidebarBadge').textContent = pending + assigned + transit;
 
     document.querySelector('.cnt-all').textContent = orders.length;

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Http\Controllers\OrderController;
 use App\Models\Delivery;
 use App\Models\Dispatch;
 use App\Models\OrderItem;
+use App\Models\Truck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -15,11 +17,17 @@ class DeliveryController extends Controller
      * Display a listing of the resource.
      */
     public function index()
-    {
-        $trucks = Dispatch::with('truck')->get();
-        $orders = Delivery::with('dispatch.orderItem.order')->get();
-        return view('deliveries.index', compact('orders', 'trucks'));
-    }
+{
+    $orders = OrderItem::with(['order', 'product'])
+        ->whereHas('order', function ($q) {
+            $q->whereNotIn('Status', ['Completed', 'Cancelled']);
+        })
+        ->get();
+
+    $trucks = Truck::with(['dispatches.drivers'])->get();
+
+    return view('deliveries.index', compact('orders', 'trucks'));
+}
 
     /**
      * Show the form for creating a new resource.
