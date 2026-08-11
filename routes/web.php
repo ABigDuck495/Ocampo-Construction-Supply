@@ -51,7 +51,8 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('orders', OrderController::class);
         Route::resource('order-items', OrderItemController::class);
         Route::resource('dispatches', DispatchController::class);
-        Route::resource('deliveries', DeliveryController::class);
+        Route::get('deliveries', [DispatchController::class, 'index'])->name('deliveries.index');
+Route::resource('deliveries', DeliveryController::class)->except(['index']);
         Route::resource('dispatch-drivers', DispatchDriverController::class);
         Route::resource('drivers', DriverController::class);
         Route::resource('trucks', TruckController::class);

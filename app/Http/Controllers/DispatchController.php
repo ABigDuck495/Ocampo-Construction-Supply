@@ -15,10 +15,10 @@ class DispatchController extends Controller
      * Display a listing of the resource.
      */
     public function index(){
-            $orders = OrderItem::whereRaw('CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatch WHERE dispatch.OrderItemID = order_items.OrderItemID)') // your unassignedItems() logic
+            $orders = OrderItem::whereRaw('CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID)') // your unassignedItems() logic
             ->with('product', 'order')
             ->get();
-        $trucks = Truck::with('dispatches.orderItem.order')->get();
+        $trucks = Truck::with('dispatches.orderItem.order', 'dispatches.drivers')->get();
 
         return view('deliveries.index', compact('orders', 'trucks'));
     }

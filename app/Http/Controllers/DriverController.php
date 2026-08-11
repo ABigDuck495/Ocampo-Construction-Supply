@@ -81,7 +81,7 @@ class DriverController extends Controller
         return response()->json(['message' => 'Driver deleted successfully.'], 200);
     }
     public function available(){
-        $busyDriverIds = DispatchDriver::whereHas('dispatch', fn($q) => $q->where('Status', 'Dispatched'))
+        $busyDriverIds = DispatchDriver::whereHas('dispatch', fn($q) => $q->where('Status', 'On Route'))
             ->pluck('DriverID');
 
         return Driver::whereNotIn('DriverID', $busyDriverIds)->get();
