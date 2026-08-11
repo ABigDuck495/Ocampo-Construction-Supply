@@ -1,0 +1,106 @@
+/* ============================================================
+   USERS PAGE
+   Relies on shared vars/classes from deliveries.css (.header,
+   .tabs, .tab, .hint, .badge, .btn, .btn-ghost, .empty-state)
+   and .data-table / .btn-export from reports.css
+   ============================================================ */
+
+.users-actions{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+}
+.users-actions .hint{margin-bottom:0;}
+
+.btn-add-user{
+    background:var(--blue);
+    color:#fff;
+    border:2px solid #000;
+    font-weight:800;
+    font-size:11px;
+    letter-spacing:.03em;
+    padding:10px 16px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    cursor:pointer;
+    box-shadow:2px 2px 0 #000;
+}
+.btn-add-user:hover{filter:brightness(1.08);}
+.btn-add-user:active{transform:translate(2px,2px);box-shadow:0 0 0 #000;}
+.btn-add-user svg{width:13px;height:13px;}
+
+.users-toolbar{display:flex;align-items:center;gap:10px;}
+
+.user-panel{
+    background:var(--panel);
+    border:2px solid var(--border);
+    padding:6px;
+}
+
+/* ---------- USER ROW EXTRAS ---------- */
+.user-cell-name{display:flex;align-items:center;gap:10px;}
+.user-avatar{
+    width:28px;height:28px;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:800;color:var(--orange);
+    flex-shrink:0;
+}
+.user-name-block .u-name{font-weight:700;font-size:11.5px;color:var(--text);}
+.user-name-block .u-email{font-size:9.5px;color:var(--text-faint);}
+
+.badge.status-active{color:var(--green);}
+.badge.status-inactive{color:var(--red);}
+
+.row-actions{display:flex;gap:6px;}
+
+/* ---------- ACTIVITY LOG MODAL (same shape as receipt modal) ---------- */
+.activity-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.7);
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:20px;
+}
+.activity-overlay.open{display:flex;}
+
+.activity-modal{
+    background:var(--panel);
+    border:2px solid #000;
+    box-shadow:5px 5px 0 #000;
+    width:100%;
+    max-width:420px;
+    display:flex;
+    flex-direction:column;
+    max-height:85vh;
+}
+.activity-head{
+    padding:16px 18px;
+    border-bottom:2px solid var(--border);
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+}
+.activity-head-name{font-size:14px;font-weight:800;}
+.activity-head-role{font-size:10px;color:var(--text-dim);margin-top:2px;}
+.activity-close{
+    background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.activity-close:hover{color:var(--text);border-color:var(--text-dim);}
+.activity-close svg{width:12px;height:12px;}
+
+.activity-body{padding:14px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+.activity-entry{
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    padding:10px 12px;
+}
+.activity-entry-top{display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:4px;}
+.activity-entry-action{font-weight:700;color:var(--text);}
+.activity-entry-time{color:var(--text-faint);}
+.activity-entry-detail{font-size:10.5px;color:var(--text-dim);}

@@ -1,0 +1,120 @@
+/* ============================================================
+   REPORTS PAGE
+   Relies on shared vars/classes from deliveries.css (.header,
+   .tabs, .tab, .hint, .badge, .btn, .btn-ghost, .empty-state)
+   ============================================================ */
+
+.reports-actions{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+}
+.reports-actions .hint{margin-bottom:0;}
+
+.btn-export{
+    background:var(--orange);
+    color:#1a1305;
+    border:2px solid #000;
+    font-weight:800;
+    font-size:11px;
+    letter-spacing:.03em;
+    padding:10px 16px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    cursor:pointer;
+    box-shadow:2px 2px 0 #000;
+    text-decoration:none;
+}
+.btn-export:hover{filter:brightness(1.08);}
+.btn-export:active{transform:translate(2px,2px);box-shadow:0 0 0 #000;}
+.btn-export svg{width:13px;height:13px;}
+
+.report-view{display:none;}
+.report-view.active{display:block;}
+
+/* ---------- STAT CARDS ---------- */
+.stat-cards{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:14px;
+    margin-bottom:18px;
+}
+@media (max-width: 1000px){.stat-cards{grid-template-columns:repeat(2, 1fr);}}
+
+.stat-card{
+    background:var(--panel);
+    border:2px solid var(--border);
+    padding:14px 16px;
+}
+.stat-card-label{font-size:9.5px;font-weight:700;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
+.stat-card-value{font-size:22px;font-weight:800;color:var(--text);}
+.stat-card-value.orange{color:var(--orange);}
+.stat-card-value.blue{color:var(--blue);}
+.stat-card-value.green{color:var(--green);}
+.stat-card-sub{font-size:9.5px;color:var(--text-faint);margin-top:4px;letter-spacing:.03em;}
+
+/* ---------- SALES SUMMARY GRID ---------- */
+.sales-grid{
+    display:grid;
+    grid-template-columns:320px 1fr;
+    gap:18px;
+    align-items:start;
+}
+@media (max-width: 900px){.sales-grid{grid-template-columns:1fr;}}
+
+.panel-box{
+    background:var(--panel);
+    border:2px solid var(--border);
+    padding:16px;
+}
+.panel-box-title{
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.05em;
+    border-bottom:2px solid var(--border);
+    padding-bottom:10px;
+    margin-bottom:12px;
+}
+
+/* top products list w/ ranking bars */
+.top-product-row{margin-bottom:12px;}
+.top-product-row:last-child{margin-bottom:0;}
+.tp-top{display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;}
+.tp-name{font-weight:700;color:var(--text);}
+.tp-value{color:var(--orange);font-weight:800;}
+.tp-bar{display:flex;gap:2px;height:10px;}
+.tp-seg{flex:1;background:var(--panel-alt);border:1px solid var(--border);}
+.tp-seg.filled{background:var(--orange);border-color:#000;}
+
+/* ---------- DATA TABLE (shared look, reports + users) ---------- */
+.data-table-wrap{overflow-x:auto;}
+.data-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:11px;
+}
+.data-table th{
+    text-align:left;
+    font-size:9.5px;
+    font-weight:800;
+    letter-spacing:.05em;
+    color:var(--text-dim);
+    border-bottom:2px solid var(--border);
+    padding:8px 10px;
+    white-space:nowrap;
+}
+.data-table td{
+    padding:10px 10px;
+    border-bottom:1px solid var(--border);
+    color:var(--text);
+    white-space:nowrap;
+}
+.data-table tbody tr:hover{background:var(--panel-alt);}
+.data-table .cell-total{color:var(--orange);font-weight:800;}
+.data-table .cell-dim{color:var(--text-dim);}
+
+/* status badges reused for delivered/paid etc. already exist in deliveries.css;
+   report-only additions below */
+.badge.role-admin{color:var(--orange);}
+.badge.role-staff{color:var(--blue);}
+.badge.role-driver{color:#c98bff;}
