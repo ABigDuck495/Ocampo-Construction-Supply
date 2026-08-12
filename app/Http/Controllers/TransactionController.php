@@ -91,6 +91,29 @@ class TransactionController extends Controller
         return response()->json(['message' => 'Transaction deleted successfully.'], 200);
     }
 
+    /**
+     * Get a receipt-formatted view of the specified transaction.
+     */
+    public function receipt(string $id)
+    {
+        $transaction = Transaction::with('order.orderItems.product')->findOrFail($id);
+
+        return response()->json([
+            'receipt_no' => $transaction->TransactionID,
+            'date' => $transaction->TransactionDate,
+            'customer_name' => $transaction->order->CustomerName,
+            'order_type' => $transaction->order->OrderType ?? 'POS',
+            'payment_method' => $transaction->PaymentMethod,
+            'payment_status' => $transaction->order->PaymentStatus,
+            'items' => $transaction->order->orderItems->map(fn($item) => [
+                'product' => $item->product->Product_Name,
+                'quantity' => $item->Quantity,
+                'status' => $item->Status,
+            ]),
+            'total' => $transaction->Amount,
+        ]);
+    }
+
     public function posSale(Request $request){
         // FIX: PaymentMethod list now matches what pos.js's payment
         // buttons actually send (COD, GCash, Card, Bank Transfer) instead

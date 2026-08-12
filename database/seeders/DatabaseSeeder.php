@@ -68,26 +68,25 @@ class DatabaseSeeder extends Seeder
         // this is what was missing before and crashing db:seed.
         // ----------------------------------------
         $products = [
-            ['name' => 'Portland Cement (40kg)',        'sku' => 'CEM-40KG',  'category' => 'Fasteners',   'subcategory' => 'Cement',        'price' => 245.00],
-            ['name' => 'Fine Sand (1 cu.m.)',            'sku' => 'SND-FINE1', 'category' => 'Tools',       'subcategory' => 'Aggregates',    'price' => 950.00],
-            ['name' => 'Gravel (3/4")',                  'sku' => 'GRV-34',    'category' => 'Tools',       'subcategory' => 'Aggregates',    'price' => 1050.00],
-            ['name' => 'Steel Rebar (10mm)',             'sku' => 'RBR-10MM',  'category' => 'Fasteners',   'subcategory' => 'Rebar',         'price' => 320.00],
-            ['name' => 'PVC Pipe (4")',                  'sku' => 'PVC-4IN',   'category' => 'Plumbing',    'subcategory' => 'Pipes',         'price' => 410.00],
-            ['name' => 'Paint - White (4L)',             'sku' => 'PNT-WHT4L', 'category' => 'Paint',       'subcategory' => 'Interior Paint','price' => 780.00],
-            ['name' => 'Roofing Sheet (Galvanized)',     'sku' => 'ROF-GLV',   'category' => 'Tools',       'subcategory' => 'Roofing',       'price' => 540.00],
-            ['name' => 'Wood Lumber (2x4x10)',           'sku' => 'LUM-2X4',   'category' => 'Tools',       'subcategory' => 'Lumber',        'price' => 295.00],
-            ['name' => 'Nails (4")',                     'sku' => 'NAIL-4IN',  'category' => 'Fasteners',   'subcategory' => 'Nails',         'price' => 85.00],
-            ['name' => 'Concrete Hollow Blocks (6")',    'sku' => 'CHB-6IN',   'category' => 'Fasteners',   'subcategory' => 'Blocks',        'price' => 18.00],
+            'Portland Cement (40kg)'      => ['Cement',     'OPC Type 1'],
+            'Fine Sand (1 cu.m.)'         => ['Aggregates', 'Sand'],
+            'Gravel (3/4")'               => ['Aggregates', 'Gravel'],
+            'Steel Rebar (10mm)'          => ['Steel',      'Rebar'],
+            'PVC Pipe (4")'               => ['Plumbing',   'Pipe'],
+            'Paint - White (4L)'          => ['Paint',      'Latex'],
+            'Roofing Sheet (Galvanized)'  => ['Roofing',    'Galvanized Sheet'],
+            'Wood Lumber (2x4x10)'        => ['Lumber',     'Framing Wood'],
+            'Nails (4")'                  => ['Hardware',   'Nails'],
+            'Concrete Hollow Blocks (6")' => ['Masonry',    'CHB'],
         ];
 
         $productIds = [];
-        foreach ($products as $p) {
+        foreach ($products as $name => $cat) {
+            [$category, $subCategory] = $cat;
             $id = DB::table('products')->insertGetId([
-                'Product_Name' => $p['name'],
-                'SKU'          => $p['sku'],
-                'Category'     => $p['category'],
-                'SubCategory'  => $p['subcategory'],
-                'Price'        => $p['price'],
+                'Product_Name' => $name,
+                'Category'     => $category,
+                'SubCategory'  => $subCategory,
                 'created_at'   => now(),
                 'updated_at'   => now(),
             ]);
