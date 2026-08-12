@@ -52,7 +52,9 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('order-items', OrderItemController::class);
         Route::resource('dispatches', DispatchController::class);
         Route::get('deliveries', [DispatchController::class, 'index'])->name('deliveries.index');
-Route::resource('deliveries', DeliveryController::class)->except(['index']);
+        Route::resource('deliveries', DeliveryController::class)->except(['index']);
+        Route::get('inventory', [InventoryController::class, 'page'])->name('inventory.index');
+        Route::post('/inventory/create-with-product', [InventoryController::class, 'storeWithProduct'])->name('inventory.storeWithProduct');
         Route::resource('dispatch-drivers', DispatchDriverController::class);
         Route::resource('drivers', DriverController::class);
         Route::resource('trucks', TruckController::class);

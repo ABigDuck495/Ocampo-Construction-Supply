@@ -2,6 +2,14 @@
    SIDEBAR STYLES
    ============================================================ */
 
+/* Keep layout intact even if sidebar is included via @include */
+body {
+    display: flex;
+    flex-direction: row;
+    margin: 0;
+}
+
+/* Sidebar stays fixed on the left */
 .sidebar{
     width:220px;
     flex-shrink:0;
@@ -11,10 +19,21 @@
     flex-direction:column;
     padding:18px 14px;
     height:100vh;
-    position:sticky;
+    position:fixed;
     top:0;
     overflow:hidden;   /* sidebar itself never scrolls */
 }
+
+/* Main content aligns correctly beside sidebar */
+.main {
+    margin-left: 220px; /* match sidebar width */
+    padding: 28px 32px 48px;
+    min-height: 100vh;
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    width: 100%;
+}
+
 .brand{
     display:flex;
     align-items:center;

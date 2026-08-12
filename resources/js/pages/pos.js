@@ -6,14 +6,17 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
 /* ---------------- CATALOG (from PosController@index) ---------------- */
 // window.POS_DATA.products is injected by the Blade view:
-// each item: { ProductID, Product_Name, Category, UnitPrice, inventory: { QuantityOnHand } }
+// each item: { ProductID, Product_Name, Category, Price, inventory: { QuantityOnHand } }
 const rawProducts = (window.POS_DATA && window.POS_DATA.products) || [];
 
 const products = rawProducts.map(p => ({
     id: p.ProductID,
     name: p.Product_Name,
     cat: p.Category || 'Hardware', // falls back until every product has a Category set
-    price: Number(p.UnitPrice) || 0,
+    // FIX: the Product model's column is `Price`, not `UnitPrice`.
+    // Reading p.UnitPrice was always undefined, so every product priced
+    // out at $0.00 in the grid, cart, and the checkout payload.
+    price: Number(p.Price) || 0,
     stock: p.inventory ? Number(p.inventory.QuantityOnHand) : 0,
 }));
 
@@ -253,6 +256,10 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
     const confirmBtn = document.getElementById('confirmBtn');
     confirmBtn.disabled = true;
 
+    // FIX: capture order type before we reset pendingOrder, so we know
+    // where to route to after a successful sale.
+    const wasDelivery = pendingOrder.orderType === 'Delivery';
+
     try {
         const res = await fetch('/transactions/pos-sale', {
             method: 'POST',
@@ -302,7 +309,14 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
         document.getElementById('custAddress').placeholder = 'Delivery address';
         document.getElementById('receiptOverlay').classList.remove('open');
 
-        window.location.href = '/deliveries';
+        // FIX: only Delivery sales should route to the deliveries board —
+        // Pickup sales are already Completed/Fulfilled, so send the
+        // cashier back to POS (refreshed) to ring up the next customer.
+        if (wasDelivery) {
+            window.location.href = '/deliveries';
+        } else {
+            window.location.reload();
+        }
     } catch (err) {
         console.error('POS sale failed:', err);
         alert('Could not reach the server. Please try again.');

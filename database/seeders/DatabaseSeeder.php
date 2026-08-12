@@ -63,23 +63,31 @@ class DatabaseSeeder extends Seeder
 
         // ----------------------------------------
         // 2. Products
+        // Category/SubCategory are NOT NULL with no default on the
+        // products table, so every seeded row needs real values —
+        // this is what was missing before and crashing db:seed.
         // ----------------------------------------
-        $productNames = [
-            'Portland Cement (40kg)',
-            'Fine Sand (1 cu.m.)',
-            'Gravel (3/4")',
-            'Steel Rebar (10mm)',
-            'PVC Pipe (4")',
-            'Paint - White (4L)',
-            'Roofing Sheet (Galvanized)',
-            'Wood Lumber (2x4x10)',
-            'Nails (4")',
-            'Concrete Hollow Blocks (6")',
+        $products = [
+            ['name' => 'Portland Cement (40kg)',        'sku' => 'CEM-40KG',  'category' => 'Fasteners',   'subcategory' => 'Cement',        'price' => 245.00],
+            ['name' => 'Fine Sand (1 cu.m.)',            'sku' => 'SND-FINE1', 'category' => 'Tools',       'subcategory' => 'Aggregates',    'price' => 950.00],
+            ['name' => 'Gravel (3/4")',                  'sku' => 'GRV-34',    'category' => 'Tools',       'subcategory' => 'Aggregates',    'price' => 1050.00],
+            ['name' => 'Steel Rebar (10mm)',             'sku' => 'RBR-10MM',  'category' => 'Fasteners',   'subcategory' => 'Rebar',         'price' => 320.00],
+            ['name' => 'PVC Pipe (4")',                  'sku' => 'PVC-4IN',   'category' => 'Plumbing',    'subcategory' => 'Pipes',         'price' => 410.00],
+            ['name' => 'Paint - White (4L)',             'sku' => 'PNT-WHT4L', 'category' => 'Paint',       'subcategory' => 'Interior Paint','price' => 780.00],
+            ['name' => 'Roofing Sheet (Galvanized)',     'sku' => 'ROF-GLV',   'category' => 'Tools',       'subcategory' => 'Roofing',       'price' => 540.00],
+            ['name' => 'Wood Lumber (2x4x10)',           'sku' => 'LUM-2X4',   'category' => 'Tools',       'subcategory' => 'Lumber',        'price' => 295.00],
+            ['name' => 'Nails (4")',                     'sku' => 'NAIL-4IN',  'category' => 'Fasteners',   'subcategory' => 'Nails',         'price' => 85.00],
+            ['name' => 'Concrete Hollow Blocks (6")',    'sku' => 'CHB-6IN',   'category' => 'Fasteners',   'subcategory' => 'Blocks',        'price' => 18.00],
         ];
+
         $productIds = [];
-        foreach ($productNames as $name) {
+        foreach ($products as $p) {
             $id = DB::table('products')->insertGetId([
-                'Product_Name' => $name,
+                'Product_Name' => $p['name'],
+                'SKU'          => $p['sku'],
+                'Category'     => $p['category'],
+                'SubCategory'  => $p['subcategory'],
+                'Price'        => $p['price'],
                 'created_at'   => now(),
                 'updated_at'   => now(),
             ]);
@@ -223,7 +231,7 @@ class DatabaseSeeder extends Seeder
                 'OrderID'         => $orderId,
                 'TransactionDate' => $faker->dateTimeBetween('-1 month', 'now'),
                 'Amount'          => $faker->randomFloat(2, 100, 5000),
-                'PaymentMethod'   => $faker->randomElement(['Cash', 'Credit', 'Cash On Delivery']),
+                'PaymentMethod'   => $faker->randomElement(['COD', 'GCash', 'Card', 'Bank Transfer']),
                 'created_at'      => now(),
                 'updated_at'      => now(),
             ]);

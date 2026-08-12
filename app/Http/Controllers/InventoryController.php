@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Inventory;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
@@ -19,6 +20,23 @@ class InventoryController extends Controller
             ->get();
     }
 
+
+    public function page()
+    {
+        $inventories = Inventory::with('product')
+            ->latest('InventoryID')
+            ->get();
+
+        $lowStockCount = Inventory::lowStock()->count();
+        $outOfStockCount = Inventory::outOfStock()->count();
+
+        return view('inventory.index', [
+            'inventories'     => $inventories,
+            'lowStockCount'   => $lowStockCount,
+            'outOfStockCount' => $outOfStockCount,
+        ]);
+    }
+
     /**
      * Show the form for creating a new resource.
      */
@@ -29,6 +47,9 @@ class InventoryController extends Controller
 
     /**
      * Store a newly created resource in storage.
+     * NOTE: this expects an EXISTING ProductID — use storeWithProduct()
+     * below when the product itself doesn't exist yet (e.g. the "Add
+     * Product" modal on the inventory page).
      */
     public function store(Request $request)
     {
@@ -45,6 +66,43 @@ class InventoryController extends Controller
         ]);
 
         return $inventory->load('product');
+    }
+
+    /**
+     * Create a brand-new Product AND its Inventory row together in one
+     * request — used by the inventory page's "+ ADD PRODUCT" modal,
+     * since that form collects both product details (name/SKU/category/
+     * subcategory/price) and stock details (quantity/reorder level) at once.
+     */
+    public function storeWithProduct(Request $request)
+    {
+        $validated = $request->validate([
+            'Product_Name'   => 'required|string|max:255',
+            'Category'       => 'required|string|max:255',
+            'SubCategory'    => 'required|string|max:255',
+            'SKU'            => 'nullable|string|max:100|unique:products,SKU',
+            'Price'          => 'nullable|numeric|min:0',
+            'QuantityOnHand' => 'required|integer|min:0',
+            'ReorderLevel'   => 'nullable|integer|min:0',
+        ]);
+
+        return DB::transaction(function () use ($validated) {
+            $product = Product::create([
+                'Product_Name' => $validated['Product_Name'],
+                'Category'     => $validated['Category'],
+                'SubCategory'  => $validated['SubCategory'],
+                'SKU'          => $validated['SKU'] ?? null,
+                'Price'        => $validated['Price'] ?? 0,
+            ]);
+
+            $inventory = Inventory::create([
+                'ProductID'      => $product->ProductID,
+                'QuantityOnHand' => $validated['QuantityOnHand'],
+                'ReorderLevel'   => $validated['ReorderLevel'] ?? 10,
+            ]);
+
+            return $inventory->load('product');
+        });
     }
 
     /**

@@ -1,25 +1,27 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * The original migration locked PaymentMethod to
+     * ['Cash', 'Credit', 'Cash On Delivery'], but the POS UI's payment
+     * buttons actually send 'COD', 'GCash', 'Card', 'Bank Transfer' —
+     * none of which matched, causing "Data truncated for column
+     * 'PaymentMethod'" on every checkout. This swaps the enum to the
+     * values the app actually uses.
      */
     public function up(): void
     {
-        Schema::create('transactions', function (Blueprint $table) {
-            $table->id('TransactionID');
-            $table->unsignedBigInteger('OrderID');
-            $table->timestamp('TransactionDate')->nullable();
-            $table->float('Amount', precision: 53)->default(0);
-            $table->enum('PaymentMethod', ['Cash', 'Credit', 'Cash On Delivery'])->default('Cash On Delivery');
-            $table->timestamps();
-            $table->foreign('OrderID')->references('OrderID')->on('orders')->onDelete('cascade');
-        });
+        DB::statement("
+            ALTER TABLE transactions
+            MODIFY PaymentMethod ENUM('COD', 'GCash', 'Card', 'Bank Transfer')
+            NOT NULL DEFAULT 'COD'
+        ");
     }
 
     /**
@@ -27,6 +29,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('transactions');
+        DB::statement("
+            ALTER TABLE transactions
+            MODIFY PaymentMethod ENUM('Cash', 'Credit', 'Cash On Delivery')
+            NOT NULL DEFAULT 'Cash On Delivery'
+        ");
     }
 };
