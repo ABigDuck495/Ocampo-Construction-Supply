@@ -35,12 +35,14 @@ class ProductController extends Controller
         // Category and SubCategory are NOT NULL with no default on the
         // products table, so both are required here.
         $validated = $request->validate([
-            'Product_Name' => 'required|string|max:255',
-            'Category'     => 'required|string|max:255',
-            'SubCategory'  => 'required|string|max:255',
-            'SKU'          => 'nullable|string|max:100|unique:products,SKU',
-            'Price'        => 'nullable|numeric|min:0',
-        ]);
+        'Product_Name'   => 'required|string|max:255',
+        'Category'       => 'required|string|max:255',
+        'SubCategory'    => 'required|string|max:255',
+        'SKU'            => 'nullable|string|max:100|unique:products,SKU',
+        'Price'          => 'required|numeric|min:0.01',
+        'QuantityOnHand' => 'required|integer|min:0',
+        'ReorderLevel'   => 'nullable|integer|min:0',
+]);
 
         $product = Product::create($validated);
 

@@ -62,7 +62,6 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('reports', ReportController::class);
         Route::resource('users', UserController::class);
         Route::resource('pos', PosController::class);
-
         Route::get('products/search', [ProductController::class, 'search']);
         Route::get('products/top-selling', [ProductController::class, 'topSelling']);
         Route::post('inventories/{inventory}/adjust', [InventoryController::class, 'adjust']);
@@ -89,6 +88,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('dispatch-drivers/swap', [DispatchDriverController::class, 'swap']);
         Route::get('dispatch-drivers/history/{driver}', [DispatchDriverController::class, 'history']);
         Route::get('deliveries/failed', [DeliveryController::class, 'failedDeliveries']);
+        Route::get('users/{user}/activity', [UserController::class, 'activity'])->name('users.activity');
+        Route::put('inventories/{inventory}/update-with-product', [InventoryController::class, 'updateWithProduct'])->name('inventory.updateWithProduct');
     });
 
     Route::middleware(['role:Admin'])->group(function () {

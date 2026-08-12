@@ -2,25 +2,31 @@
 
 namespace App\Models;
 
-// use Illuminate\Database\Eloquent\Model;
-// use Illuminate\Auth\Authenticatable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Hash;
-// use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
     protected $table = 'users';
     protected $primaryKey = 'UserID';
-    protected $fillable = ['Name', 'Password', 'Role', 'Email', 'PhoneNumber'];
+    protected $fillable = ['Name', 'Password', 'Role', 'Email', 'PhoneNumber', 'Status', 'LastLoginAt'];
     protected $hidden = ['Password'];
 
     protected $guarded = ['UserID'];
     public $timestamps = false;
 
+    protected $casts = [
+        'LastLoginAt' => 'datetime',
+    ];
+
     public function orders(){
         return $this->hasMany(Order::class, 'CreatedBy', 'UserID');
     }
+
+    public function transactions(){
+        return $this->hasMany(Transaction::class, 'CreatedBy', 'UserID');
+    }
+
     public function setPasswordAttribute($value)
     {
         if (empty($value)) {
@@ -40,13 +46,14 @@ class User extends Authenticatable
         return $this->Password;
     }
 
-    // public function getAuthIdentifierName(): string
-    // {
-    //     return 'Email';
-    // }
-
     public function resetPassword($newPassword) {
         $this->Password = bcrypt($newPassword);
+        $this->save();
+    }
+
+    public function markLoggedIn()
+    {
+        $this->LastLoginAt = now();
         $this->save();
     }
 
@@ -55,5 +62,11 @@ class User extends Authenticatable
     }
     public function scopeStaffs($query) {
         return $query->where('Role', 'Staff');
+    }
+    public function scopeActive($query) {
+        return $query->where('Status', 'Active');
+    }
+    public function scopeInactive($query) {
+        return $query->where('Status', 'Inactive');
     }
 }

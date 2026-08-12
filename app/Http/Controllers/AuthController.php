@@ -29,6 +29,7 @@ class AuthController extends Controller
         }
 
         $user = Auth::user();
+        $user->markLoggedIn();
 
         $request->session()->regenerate();
 

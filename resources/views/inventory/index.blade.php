@@ -1,4 +1,4 @@
-    <head>
+<head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Inventory - Ironclad Hardware</title>
@@ -192,7 +192,68 @@
         </div>
     </div>
 
+    <!-- ============================================================
+        EDIT PRODUCT MODAL
+        ============================================================ -->
+    <div class="modal-overlay" id="editProductModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>EDIT PRODUCT</h2>
+                <button type="button" class="modal-close" id="editModalCloseBtn" aria-label="Close">&times;</button>
+            </div>
+            <form id="editProductForm" data-update-url-template="{{ route('inventory.updateWithProduct', ['inventory' => '__ID__']) }}">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <label for="editFldName">Product Name</label>
+                        <input type="text" id="editFldName" name="Product_Name" required>
+                    </div>
+                    <div class="form-row-split">
+                        <div class="form-row">
+                            <label for="editFldSku">SKU (optional)</label>
+                            <input type="text" id="editFldSku" name="SKU">
+                        </div>
+                        <div class="form-row">
+                            <label for="editFldCategory">Category</label>
+                            <select id="editFldCategory" name="Category" required>
+                                <option value="Tools">Tools</option>
+                                <option value="Power Tools">Power Tools</option>
+                                <option value="Plumbing">Plumbing</option>
+                                <option value="Fasteners">Fasteners</option>
+                                <option value="Electrical">Electrical</option>
+                                <option value="Paint">Paint</option>
+                                <option value="Safety">Safety</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="editFldSubCategory">Sub-Category</label>
+                        <input type="text" id="editFldSubCategory" name="SubCategory" required>
+                    </div>
+                    <div class="form-row-split">
+                        <div class="form-row">
+                            <label for="editFldPrice">Price ($)</label>
+                            <input type="number" id="editFldPrice" name="Price" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-row">
+                            <label for="editFldStock">Quantity On Hand</label>
+                            <input type="number" id="editFldStock" name="QuantityOnHand" min="0" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="editFldReorderLevel">Reorder Level</label>
+                        <input type="number" id="editFldReorderLevel" name="ReorderLevel" min="0">
+                    </div>
+                    <div class="form-error" id="editModalFormError"></div>
+                </div>
+                <div class="modal-foot">
+                    <button type="button" class="btn-cancel" id="editModalCancelBtn">CANCEL</button>
+                    <button type="submit" class="btn-submit" id="editModalSubmitBtn">SAVE CHANGES</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Separated scripts -->
-    @vite(['resources/js/pages/inventory.js', 'resources/js/pages/sidebar.js', 'resources/js/pages/inventory-add-product.js'])
+    @vite(['resources/js/pages/inventory.js', 'resources/js/pages/sidebar.js', 'resources/js/pages/inventory-add-product.js', 'resources/js/pages/inventory-edit-product.js'])
     </body>
     </html>

@@ -81,7 +81,7 @@ class InventoryController extends Controller
             'Category'       => 'required|string|max:255',
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU',
-            'Price'          => 'nullable|numeric|min:0',
+            'Price'          => 'required|numeric|min:0.01',
             'QuantityOnHand' => 'required|integer|min:0',
             'ReorderLevel'   => 'nullable|integer|min:0',
         ]);
@@ -92,7 +92,7 @@ class InventoryController extends Controller
                 'Category'     => $validated['Category'],
                 'SubCategory'  => $validated['SubCategory'],
                 'SKU'          => $validated['SKU'] ?? null,
-                'Price'        => $validated['Price'] ?? 0,
+                'Price'        => $validated['Price'],
             ]);
 
             $inventory = Inventory::create([
@@ -137,6 +137,42 @@ class InventoryController extends Controller
         $inventory->save();
 
         return $inventory->load('product');
+    }
+
+    /**
+     * Update the Product's own fields (name/SKU/category/subcategory/price)
+     * AND its Inventory row (quantity/reorder level) together — the
+     * counterpart to storeWithProduct(), used by the inventory page's
+     * EDIT button/modal.
+     */
+    public function updateWithProduct(Request $request, Inventory $inventory)
+    {
+        $validated = $request->validate([
+            'Product_Name'   => 'required|string|max:255',
+            'Category'       => 'required|string|max:255',
+            'SubCategory'    => 'required|string|max:255',
+            'SKU'            => 'nullable|string|max:100|unique:products,SKU,' . $inventory->ProductID . ',ProductID',
+            'Price'          => 'required|numeric|min:0.01',
+            'QuantityOnHand' => 'required|integer|min:0',
+            'ReorderLevel'   => 'nullable|integer|min:0',
+        ]);
+
+        return DB::transaction(function () use ($validated, $inventory) {
+            $inventory->product->update([
+                'Product_Name' => $validated['Product_Name'],
+                'Category'     => $validated['Category'],
+                'SubCategory'  => $validated['SubCategory'],
+                'SKU'          => $validated['SKU'] ?? null,
+                'Price'        => $validated['Price'],
+            ]);
+
+            $inventory->update([
+                'QuantityOnHand' => $validated['QuantityOnHand'],
+                'ReorderLevel'   => $validated['ReorderLevel'] ?? $inventory->ReorderLevel,
+            ]);
+
+            return $inventory->fresh()->load('product');
+        });
     }
 
     /**

@@ -1,41 +1,26 @@
 /* ============================================================
    USERS - DATA + LOGIC
-   Mock data below mirrors the shape used in deliveries.js/pos.js.
-   Swap for real data from your Laravel User model once wired up.
+   Pulls real data from the Laravel backend.
    ============================================================ */
 
-let users = [
-    { id:'U001', name:'Ben Santos',   email:'ben.santos@ironclad.ph',   role:'driver', status:'active',   lastLogin:'Jul 23, 2026, 8:02 AM',
-      activity:[
-        { action:'Logged in', time:'Jul 23, 2026, 8:02 AM', detail:'Web app · Manila' },
-        { action:'Dispatched truck Ironclad 01', time:'Jul 23, 2026, 9:10 AM', detail:'2 orders assigned' },
-      ] },
-    { id:'U002', name:'Mia Cruz',     email:'mia.cruz@ironclad.ph',     role:'driver', status:'active',   lastLogin:'Jul 22, 2026, 1:15 PM',
-      activity:[
-        { action:'Marked order delivered', time:'Jul 22, 2026, 2:55 PM', detail:'RC-041956' },
-        { action:'Logged in', time:'Jul 22, 2026, 1:15 PM', detail:'Web app · Manila' },
-      ] },
-    { id:'U003', name:'Jake Reyes',   email:'jake.reyes@ironclad.ph',   role:'driver', status:'inactive', lastLogin:'Jul 15, 2026, 10:40 AM',
-      activity:[
-        { action:'Logged in', time:'Jul 15, 2026, 10:40 AM', detail:'Web app · Manila' },
-      ] },
-    { id:'U004', name:'Shan Ocampo',  email:'shan@ironclad.ph',         role:'admin',  status:'active',   lastLogin:'Jul 23, 2026, 7:45 AM',
-      activity:[
-        { action:'Updated inventory stock levels', time:'Jul 23, 2026, 7:50 AM', detail:'12 items adjusted' },
-        { action:'Logged in', time:'Jul 23, 2026, 7:45 AM', detail:'Web app · Manila' },
-      ] },
-    { id:'U005', name:'Lea Fernandez',email:'lea.fernandez@ironclad.ph',role:'staff',  status:'active',   lastLogin:'Jul 23, 2026, 8:30 AM',
-      activity:[
-        { action:'Processed checkout', time:'Jul 23, 2026, 8:55 AM', detail:'Order RC-041823' },
-        { action:'Logged in', time:'Jul 23, 2026, 8:30 AM', detail:'Web app · Manila' },
-      ] },
-    { id:'U006', name:'Noel Ramos',   email:'noel.ramos@ironclad.ph',   role:'staff',  status:'inactive', lastLogin:'Jul 10, 2026, 4:20 PM',
-      activity:[
-        { action:'Logged in', time:'Jul 10, 2026, 4:20 PM', detail:'Web app · Manila' },
-      ] },
-];
-
+let users = [];
 let activeRoleTab = 'all';
+
+/* ---------------- FETCH ---------------- */
+async function loadUsers(){
+    try {
+        const res = await fetch('/users', {
+            headers: { 'Accept': 'application/json' },
+        });
+        if(!res.ok) throw new Error('Failed to load users');
+        users = await res.json();
+    } catch (err) {
+        console.error(err);
+        users = [];
+    }
+    renderUserStats();
+    renderUserTable();
+}
 
 /* ---------------- HEADER STATS ---------------- */
 function renderUserStats(){
@@ -72,14 +57,14 @@ function renderUserTable(){
                     <div class="user-avatar">${initials(u.name)}</div>
                     <div class="user-name-block">
                         <div class="u-name">${u.name}</div>
-                        <div class="u-email">${u.email}</div>
+                        <div class="u-email">${u.email ?? ''}</div>
                     </div>
                 </div>
             </td>
             <td>${badgeForRole(u.role)}</td>
             <td>${badgeForStatus(u.status)}</td>
-            <td class="cell-dim">${u.lastLogin}</td>
-            <td class="cell-dim">${u.activity.length} entr${u.activity.length === 1 ? 'y' : 'ies'}</td>
+            <td class="cell-dim">${u.lastLogin ?? 'NEVER'}</td>
+            <td class="cell-dim">&mdash;</td>
             <td>
                 <div class="row-actions">
                     <button class="btn-ghost" data-view-activity="${u.id}">ACTIVITY</button>
@@ -93,26 +78,41 @@ function renderUserTable(){
 }
 
 /* ---------------- ACTIVITY MODAL ---------------- */
-function openActivityModal(userId){
-    const user = users.find(u => u.id === userId);
+async function openActivityModal(userId){
+    const user = users.find(u => String(u.id) === String(userId));
     if(!user) return;
 
     document.getElementById('activityHeadName').textContent = user.name;
-    document.getElementById('activityHeadRole').textContent = `${user.role.toUpperCase()} &middot; ${user.email}`.replace('&middot;', '·');
+    document.getElementById('activityHeadRole').textContent = `${user.role.toUpperCase()} · ${user.email ?? ''}`;
 
     const body = document.getElementById('activityBody');
-    body.innerHTML = user.activity.length
-        ? user.activity.map(a => `
+    body.innerHTML = `<div class="empty-state">LOADING&hellip;</div>`;
+    document.getElementById('activityOverlay').classList.add('open');
+
+    try {
+        const res = await fetch(`/users/${userId}/activity`, {
+            headers: { 'Accept': 'application/json' },
+        });
+        if(!res.ok) throw new Error('Failed to load activity');
+        const data = await res.json();
+
+        body.innerHTML = `
             <div class="activity-entry">
                 <div class="activity-entry-top">
-                    <span class="activity-entry-action">${a.action}</span>
-                    <span class="activity-entry-time">${a.time}</span>
+                    <span class="activity-entry-action">Orders Created</span>
+                    <span class="activity-entry-time">${data.ordersCreated}</span>
                 </div>
-                <div class="activity-entry-detail">${a.detail}</div>
-            </div>`).join('')
-        : `<div class="empty-state">NO ACTIVITY RECORDED</div>`;
-
-    document.getElementById('activityOverlay').classList.add('open');
+            </div>
+            <div class="activity-entry">
+                <div class="activity-entry-top">
+                    <span class="activity-entry-action">Transactions Processed</span>
+                    <span class="activity-entry-time">${data.transactionsProcessed}</span>
+                </div>
+            </div>`;
+    } catch (err) {
+        console.error(err);
+        body.innerHTML = `<div class="empty-state">FAILED TO LOAD ACTIVITY</div>`;
+    }
 }
 
 document.getElementById('activityCloseBtn').addEventListener('click', () => {
@@ -133,5 +133,4 @@ document.getElementById('userTabs').addEventListener('click', e => {
 });
 
 /* ---------------- INIT ---------------- */
-renderUserStats();
-renderUserTable();
+loadUsers();

@@ -10,10 +10,18 @@ class UserController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $users = User::all();
+
+        if ($request->wantsJson()) {
+            return response()->json(
+                $users->map(fn (User $user) => $this->formatUser($user))->values()
+            );
+        }
+
         return view('users.index', [
-            'users' => User::all(),
+            'users' => $users,
         ]);
     }
 
@@ -36,6 +44,7 @@ class UserController extends Controller
             'Role' => 'nullable|string|max:50',
             'Email' => 'nullable|email|max:255',
             'PhoneNumber' => 'nullable|string|max:20',
+            'Status' => 'nullable|in:Active,Inactive',
         ]);
 
         return User::create($validated);
@@ -68,6 +77,7 @@ class UserController extends Controller
             'Role' => 'nullable|string|max:50',
             'Email' => 'nullable|email|max:255',
             'PhoneNumber' => 'nullable|string|max:20',
+            'Status' => 'nullable|in:Active,Inactive',
         ]);
 
         $user = User::findOrFail($id);
@@ -87,14 +97,30 @@ class UserController extends Controller
 
         return response()->json(['message' => 'User deleted successfully.'], 200);
     }
-    public function activity(Request $request, User $user){
-        return [
-            'orders_created' => $user->orders()
+
+    public function activity(Request $request, User $user)
+    {
+        return response()->json([
+            'ordersCreated' => $user->orders()
                 ->when($request->date, fn($q) => $q->whereDate('OrderDate', $request->date))
                 ->count(),
-            'transactions_processed' => $user->transactions()
+            'transactionsProcessed' => $user->transactions()
                 ->when($request->date, fn($q) => $q->whereDate('TransactionDate', $request->date))
                 ->count(),
+        ]);
+    }
+
+    private function formatUser(User $user): array
+    {
+        return [
+            'id' => $user->UserID,
+            'name' => $user->Name,
+            'email' => $user->Email,
+            'role' => strtolower($user->Role ?? ''),
+            'status' => strtolower($user->Status ?? 'active'),
+            'lastLogin' => $user->LastLoginAt
+                ? $user->LastLoginAt->format('M j, Y, g:i A')
+                : null,
         ];
     }
 }

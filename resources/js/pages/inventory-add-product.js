@@ -86,7 +86,6 @@
 
         const tr = document.createElement('tr');
         tr.dataset.inventoryId = inventory.InventoryID ?? '';
-        tr.dataset.productId = product.ProductID ?? '';
         tr.innerHTML = `
             <td class="col-product">
                 <div class="prod-cell">${categoryIconSvg()}<span>${escapeHtml(product.Product_Name)}</span></div>
@@ -96,8 +95,18 @@
             <td class="price-cell">$${price.toFixed(2)}</td>
             <td><span class="${stockPillClass(qty, reorderLevel)}">${qty}</span></td>
             <td class="actions-cell">
-                <button type="button" class="btn-edit">EDIT</button>
-                <button type="button" class="btn-del">DELETE</button>
+                <button type="button" class="btn-edit"
+                    data-inventory-id="${inventory.InventoryID ?? ''}"
+                    data-product-id="${product.ProductID ?? ''}"
+                    data-name="${escapeHtml(product.Product_Name)}"
+                    data-sku="${escapeHtml(product.SKU)}"
+                    data-category="${escapeHtml(product.Category)}"
+                    data-subcategory="${escapeHtml(product.SubCategory)}"
+                    data-price="${product.Price}"
+                    data-stock="${inventory.QuantityOnHand}"
+                    data-reorder-level="${inventory.ReorderLevel}"
+                >EDIT</button>
+                <button type="button" class="btn-del" data-inventory-id="${inventory.InventoryID ?? ''}">DELETE</button>
             </td>
         `;
         productBody.appendChild(tr);
