@@ -13,9 +13,6 @@ const products = rawProducts.map(p => ({
     id: p.ProductID,
     name: p.Product_Name,
     cat: p.Category || 'Hardware', // falls back until every product has a Category set
-    // FIX: the Product model's column is `Price`, not `UnitPrice`.
-    // Reading p.UnitPrice was always undefined, so every product priced
-    // out at $0.00 in the grid, cart, and the checkout payload.
     price: Number(p.Price) || 0,
     stock: p.inventory ? Number(p.inventory.QuantityOnHand) : 0,
 }));
@@ -214,6 +211,13 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
     };
 
     renderReceipt(pendingOrder);
+
+    // Show only the confirm button that matches this order's type —
+    // a Pickup order should never see "SEND TO DELIVERY" and vice versa.
+    const isDelivery = orderType === 'Delivery';
+    document.getElementById('confirmDeliveryBtn').style.display = isDelivery ? '' : 'none';
+    document.getElementById('confirmPickupBtn').style.display = isDelivery ? 'none' : '';
+
     document.getElementById('receiptOverlay').classList.add('open');
 });
 
@@ -222,8 +226,8 @@ function renderReceipt(order){
     const now = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
 
     paper.innerHTML = `
-        <h2>OCAMPO CONSTRUCTION & HARDWARE</h2>
-        <div class="r-sub">Sual, Pangasinan</div>
+        <h2>IRONCLAD HARDWARE</h2>
+        <div class="r-sub">Ocampo Construction &amp; Hardware Supplies</div>
         <div class="r-meta">Date: ${now}</div>
         <div class="r-meta">Customer: ${order.customer}</div>
         <div class="r-meta">Contact: ${order.contact}</div>
@@ -249,15 +253,18 @@ document.getElementById('printBtn').addEventListener('click', () => {
     window.print();
 });
 
-/* Confirm & Send: actually persists the sale via TransactionController@posSale */
-document.getElementById('confirmBtn').addEventListener('click', async () => {
+/* ----------------------------------------------------------
+   Shared sale-confirmation logic used by BOTH the Delivery and
+   Pickup confirm buttons. The backend (TransactionController@posSale)
+   already saves order items for every item regardless of order type,
+   so both buttons post the exact same payload — the only difference
+   between them is the label shown and where the browser goes
+   afterward.
+   ---------------------------------------------------------- */
+async function submitSale(triggerBtn){
     if(!pendingOrder) return;
 
-    const confirmBtn = document.getElementById('confirmBtn');
-    confirmBtn.disabled = true;
-
-    // FIX: capture order type before we reset pendingOrder, so we know
-    // where to route to after a successful sale.
+    triggerBtn.disabled = true;
     const wasDelivery = pendingOrder.orderType === 'Delivery';
 
     try {
@@ -287,7 +294,7 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
         if(!res.ok){
             const err = await res.json().catch(() => ({}));
             alert(err.message || 'Something went wrong processing the sale.');
-            confirmBtn.disabled = false;
+            triggerBtn.disabled = false;
             return;
         }
 
@@ -309,7 +316,7 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
         document.getElementById('custAddress').placeholder = 'Delivery address';
         document.getElementById('receiptOverlay').classList.remove('open');
 
-        // FIX: only Delivery sales should route to the deliveries board —
+        // Only a Delivery sale should route to the deliveries board —
         // Pickup sales are already Completed/Fulfilled, so send the
         // cashier back to POS (refreshed) to ring up the next customer.
         if (wasDelivery) {
@@ -320,8 +327,16 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
     } catch (err) {
         console.error('POS sale failed:', err);
         alert('Could not reach the server. Please try again.');
-        confirmBtn.disabled = false;
+        triggerBtn.disabled = false;
     }
+}
+
+document.getElementById('confirmDeliveryBtn').addEventListener('click', function(){
+    submitSale(this);
+});
+
+document.getElementById('confirmPickupBtn').addEventListener('click', function(){
+    submitSale(this);
 });
 
 /* ---------------- INIT ---------------- */
