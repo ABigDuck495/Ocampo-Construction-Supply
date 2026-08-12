@@ -64,22 +64,25 @@ class DatabaseSeeder extends Seeder
         // ----------------------------------------
         // 2. Products
         // ----------------------------------------
-        $productNames = [
-            'Portland Cement (40kg)',
-            'Fine Sand (1 cu.m.)',
-            'Gravel (3/4")',
-            'Steel Rebar (10mm)',
-            'PVC Pipe (4")',
-            'Paint - White (4L)',
-            'Roofing Sheet (Galvanized)',
-            'Wood Lumber (2x4x10)',
-            'Nails (4")',
-            'Concrete Hollow Blocks (6")',
+        $products = [
+            'Portland Cement (40kg)'      => ['Cement',     'OPC Type 1'],
+            'Fine Sand (1 cu.m.)'         => ['Aggregates', 'Sand'],
+            'Gravel (3/4")'               => ['Aggregates', 'Gravel'],
+            'Steel Rebar (10mm)'          => ['Steel',      'Rebar'],
+            'PVC Pipe (4")'               => ['Plumbing',   'Pipe'],
+            'Paint - White (4L)'          => ['Paint',      'Latex'],
+            'Roofing Sheet (Galvanized)'  => ['Roofing',    'Galvanized Sheet'],
+            'Wood Lumber (2x4x10)'        => ['Lumber',     'Framing Wood'],
+            'Nails (4")'                  => ['Hardware',   'Nails'],
+            'Concrete Hollow Blocks (6")' => ['Masonry',    'CHB'],
         ];
         $productIds = [];
-        foreach ($productNames as $name) {
+        foreach ($products as $name => $cat) {
+            [$category, $subCategory] = $cat;
             $id = DB::table('products')->insertGetId([
                 'Product_Name' => $name,
+                'Category'     => $category,
+                'SubCategory'  => $subCategory,
                 'created_at'   => now(),
                 'updated_at'   => now(),
             ]);
