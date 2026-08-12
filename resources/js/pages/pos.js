@@ -222,8 +222,8 @@ function renderReceipt(order){
     const now = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
 
     paper.innerHTML = `
-        <h2>IRONCLAD HARDWARE</h2>
-        <div class="r-sub">Ocampo Construction &amp; Hardware Supplies</div>
+        <h2>OCAMPO CONSTRUCTION & HARDWARE</h2>
+        <div class="r-sub">Sual, Pangasinan</div>
         <div class="r-meta">Date: ${now}</div>
         <div class="r-meta">Customer: ${order.customer}</div>
         <div class="r-meta">Contact: ${order.contact}</div>
