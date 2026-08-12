@@ -63,6 +63,9 @@ class DatabaseSeeder extends Seeder
 
         // ----------------------------------------
         // 2. Products
+        // Category/SubCategory are NOT NULL with no default on the
+        // products table, so every seeded row needs real values —
+        // this is what was missing before and crashing db:seed.
         // ----------------------------------------
         $products = [
             'Portland Cement (40kg)'      => ['Cement',     'OPC Type 1'],
@@ -76,6 +79,7 @@ class DatabaseSeeder extends Seeder
             'Nails (4")'                  => ['Hardware',   'Nails'],
             'Concrete Hollow Blocks (6")' => ['Masonry',    'CHB'],
         ];
+
         $productIds = [];
         foreach ($products as $name => $cat) {
             [$category, $subCategory] = $cat;
@@ -226,7 +230,7 @@ class DatabaseSeeder extends Seeder
                 'OrderID'         => $orderId,
                 'TransactionDate' => $faker->dateTimeBetween('-1 month', 'now'),
                 'Amount'          => $faker->randomFloat(2, 100, 5000),
-                'PaymentMethod'   => $faker->randomElement(['Cash', 'Credit', 'Cash On Delivery']),
+                'PaymentMethod'   => $faker->randomElement(['COD', 'GCash', 'Card', 'Bank Transfer']),
                 'created_at'      => now(),
                 'updated_at'      => now(),
             ]);

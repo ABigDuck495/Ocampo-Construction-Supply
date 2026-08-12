@@ -15,6 +15,9 @@ export default defineConfig({
                 'resources/js/pages/pos.js',
                 'resources/js/pages/deliveries.js',
                 'resources/js/pages/sidebar.js',
+                'resources/js/pages/inventory.js',
+                'resources/css/inventory.css',
+
             ],
             refresh: true,
         }),

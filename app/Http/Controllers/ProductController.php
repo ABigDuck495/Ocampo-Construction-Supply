@@ -32,13 +32,17 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
+        // Category and SubCategory are NOT NULL with no default on the
+        // products table, so both are required here.
         $validated = $request->validate([
             'Product_Name' => 'required|string|max:255',
+            'Category'     => 'required|string|max:255',
+            'SubCategory'  => 'required|string|max:255',
+            'SKU'          => 'nullable|string|max:100|unique:products,SKU',
+            'Price'        => 'nullable|numeric|min:0',
         ]);
 
-        $product = new Product();
-        $product->Product_Name = $validated['Product_Name'];
-        $product->save();
+        $product = Product::create($validated);
 
         return $product->load('inventory');
     }
@@ -66,14 +70,14 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'Product_Name' => 'sometimes|required|string|max:255',
+            'Category'     => 'sometimes|required|string|max:255',
+            'SubCategory'  => 'sometimes|required|string|max:255',
+            'SKU'          => 'sometimes|nullable|string|max:100|unique:products,SKU,' . $id . ',ProductID',
+            'Price'        => 'sometimes|nullable|numeric|min:0',
         ]);
 
         $product = Product::findOrFail($id);
-
-        if (array_key_exists('Product_Name', $validated)) {
-            $product->Product_Name = $validated['Product_Name'];
-        }
-
+        $product->fill($validated);
         $product->save();
 
         return $product->load('inventory');
@@ -89,6 +93,7 @@ class ProductController extends Controller
 
         return response()->json(['message' => 'Product deleted successfully.'], 200);
     }
+
     public function search(Request $request){
         return Product::where('Product_Name', 'like', '%' . $request->q . '%')
             ->with('inventory')
@@ -109,5 +114,4 @@ class ProductController extends Controller
             ->limit(10)
             ->get();
     }
-    
 }

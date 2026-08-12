@@ -8,26 +8,24 @@ class Product extends Model
 {
     protected $table = 'products';
     protected $primaryKey = 'ProductID';
+
+    // Matches the real columns: ProductID, Category, SubCategory,
+    // Product_Name (all NOT NULL from the original migration), plus
+    // SKU and Price (nullable/defaulted, added separately).
     protected $fillable = [
         'Product_Name',
-        'ProductName'
+        'SKU',
+        'Category',
+        'SubCategory',
+        'Price',
     ];
-    protected $guarded = ['ProductID'];
+
     public function inventory(){
         return $this->hasOne(Inventory::class, 'ProductID', 'ProductID');
     }
     public function orderItems(){
         return $this->hasMany(OrderItem::class, 'ProductID', 'ProductID');
     }
-    // public function transactions(){
-    //     return $this->hasManyThrough(Transaction::class, OrderItem::class, 'ProductID', 'OrderID', 'ProductID', 'OrderID');
-    // }
-    // public function scopeActive($query) {
-    //     return $query->where('Status', 'Active');
-    // }
-    // public function scopeInactive($query) {
-    //     return $query->where('Status', 'Inactive');
-    // }
     public function isLowStock() {
         return $this->inventory && $this->inventory->QuantityOnHand <= $this->inventory->ReorderLevel;
     }
@@ -40,5 +38,4 @@ class Product extends Model
     public function isOutOfStock() {
         return $this->inventory && $this->inventory->QuantityOnHand <= 0;
     }
-
 }

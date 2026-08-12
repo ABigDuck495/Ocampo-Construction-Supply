@@ -1,0 +1,428 @@
+/* ============================================================
+   INVENTORY / PRODUCT CATALOG
+   ============================================================ */
+
+:root {
+    --bg: #10131a;
+    --panel: #171b24;
+    --panel-alt: #1b202c;
+    --border: #2a3040;
+    --orange: #f5a623;
+    --orange-dark: #d98c12;
+    --green: #3ecf6e;
+    --red: #ff5c5c;
+    --text: #e6e8ee;
+    --text-dim: #8b93a6;
+    --radius: 6px;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    margin: 0;
+}
+
+/* Shared layout (sidebar width, .main margin-left/padding/min-height) is
+   owned by sidebar.css, which loads before this file. Don't redeclare
+   those here — that's what caused the mismatched 240px vs 220px gap. */
+.main {
+    background: var(--bg);
+    margin-left: 240px;
+}
+
+
+/* ---------- HEADER ---------- */
+.header {
+    background-color: var(--orange);
+    background-image: radial-gradient(rgba(0,0,0,.16) 1.4px, transparent 1.4px);
+    background-size: 11px 11px;
+    border: 3px solid #000;
+    box-shadow: 4px 4px 0 #000;
+    border-radius: 2px;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+}
+
+.header h1 {
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: #14161c;
+    margin: 0 0 4px;
+    font-weight: 800;
+}
+
+.header #headerSub {
+    margin: 0;
+    color: #2a1f08;
+    font-size: 13px;
+    opacity: .85;
+}
+
+.header-stats {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.hstat {
+    background: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 22px;
+    min-width: 100px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.12);
+}
+
+.hstat b {
+    display: block;
+    font-size: 20px;
+    line-height: 1.1;
+    font-weight: 800;
+    color: var(--orange-dark);
+    letter-spacing: .5px;
+}
+
+.hstat span {
+    display: block;
+    font-size: 10px;
+    color: #6b7280;
+    letter-spacing: .5px;
+    margin-top: 5px;
+    font-weight: 700;
+}
+
+.hstat.value b { color: var(--green); }
+.hstat.low b { color: var(--orange-dark); }
+.hstat.out b { color: var(--red); }
+
+.add-product-btn {
+    background: #14161c;
+    color: #ffffff;
+    border: 2px solid #000;
+    border-radius: 2px;
+    padding: 14px 20px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .5px;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 3px 3px 0 rgba(0,0,0,.35);
+}
+
+    /* Remove hover effect for add product button */
+    .add-product-btn:hover { background: #14161c; }
+
+    /* .add-product-btn:hover { background: #fff; }  */
+
+
+/* ---------- SEARCH ---------- */
+.search-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+
+.search-bar svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+
+.search-bar input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: .5px;
+    width: 100%;
+}
+
+.search-bar input::placeholder { color: var(--text-dim); }
+
+/* ---------- CATEGORY TABS ---------- */
+.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: .5px;
+    cursor: pointer;
+    background: var(--panel);
+}
+
+.tab svg {
+    width: 14px;
+    height: 14px;
+}
+
+.tab.active {
+    background: var(--orange);
+    color: #14161c;
+    border-color: var(--orange);
+    font-weight: 700;
+}
+
+.tab:not(.active):hover {
+    border-color: var(--orange-dark);
+    color: var(--text);
+}
+
+/* ---------- PRODUCT TABLE ---------- */
+.product-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.product-table thead th {
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: .5px;
+    color: var(--text-dim);
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.product-table tbody td {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+}
+
+.product-table tbody tr:last-child td { border-bottom: none; }
+.product-table tbody tr:hover { background: var(--panel-alt); }
+
+.prod-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+}
+
+.prod-cell svg {
+    width: 16px;
+    height: 16px;
+    color: var(--orange);
+    flex-shrink: 0;
+}
+
+.sku-cell { color: var(--text-dim); }
+
+.cat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.cat-pill svg {
+    width: 12px;
+    height: 12px;
+}
+
+.price-cell {
+    color: var(--orange);
+    font-weight: 700;
+}
+
+.stock-pill {
+    display: inline-block;
+    border: 1px solid var(--green);
+    color: var(--green);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.stock-pill.low { border-color: var(--orange); color: var(--orange); }
+.stock-pill.out { border-color: var(--red); color: var(--red); }
+
+.actions-cell { display: flex; gap: 8px; }
+
+.btn-edit, .btn-del {
+    border: 1px solid var(--border);
+    background: var(--panel-alt);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    cursor: pointer;
+}
+
+.btn-del { color: var(--red); border-color: rgba(255,92,92,.4); }
+.btn-edit:hover { border-color: var(--orange); }
+.btn-del:hover { background: rgba(255,92,92,.12); }
+
+.empty-row td {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 40px 0;
+}
+
+/* ---------- ADD PRODUCT MODAL ---------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 12, 18, .72);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 460px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+    margin: 0;
+    font-size: 15px;
+    letter-spacing: .5px;
+    color: var(--text);
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+}
+.modal-close:hover { color: var(--red); }
+
+.modal-body { padding: 20px 22px; }
+
+.form-row { margin-bottom: 14px; }
+.form-row label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: .5px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+
+.form-row input,
+.form-row select {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+}
+.form-row input:focus,
+.form-row select:focus { border-color: var(--orange); }
+
+.form-row-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.form-error {
+    color: var(--red);
+    font-size: 11px;
+    margin-top: 6px;
+    display: none;
+}
+.form-error.show { display: block; }
+
+.modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 22px;
+    border-top: 1px solid var(--border);
+}
+
+.btn-cancel {
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 10px 18px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    cursor: pointer;
+}
+.btn-cancel:hover { border-color: var(--text-dim); }
+
+.btn-submit {
+    background: var(--orange-dark);
+    border: none;
+    color: #fff;
+    border-radius: 4px;
+    padding: 10px 18px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    cursor: pointer;
+}
+.btn-submit:hover { background: var(--orange); color: #14161c; }
+.btn-submit:disabled { opacity: .6; cursor: default; }
