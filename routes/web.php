@@ -17,6 +17,7 @@ use App\Http\Controllers\AuthController as LoginController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\PrinterController;
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -91,6 +92,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('users/{user}/activity', [UserController::class, 'activity'])->name('users.activity');
         Route::put('inventories/{inventory}/update-with-product', [InventoryController::class, 'updateWithProduct'])->name('inventory.updateWithProduct');
     });
+        Route::resource('printers', PrinterController::class)->except(['show', 'edit', 'create']);
+        Route::post('/api/print-receipt', [PrinterController::class, 'printReceipt'])->name('print-receipt');
 
     Route::middleware(['role:Admin'])->group(function () {
         Route::resource('users', UserController::class);

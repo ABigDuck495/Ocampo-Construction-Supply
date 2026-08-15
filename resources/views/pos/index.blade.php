@@ -15,6 +15,12 @@
 <script>
     window.POS_DATA = { products: @json($products) };
 </script>
+<script src="https://cdn.jsdelivr.net/npm/qz-tray/qz-tray.js"></script>
+
+<!-- <button id="testPrintBtn" style="position:fixed; bottom:20px; right:20px; z-index:9999; padding:10px 16px; background:#222; color:#fff; border:none; border-radius:6px; cursor:pointer;">
+    TEST PRINT
+</button> -->
+
 @vite(['resources/js/pages/sidebar.js', 'resources/js/pages/pos.js'])
 <!-- Shared stylesheets (same design system as Delivery Ops) -->
 @vite(['resources/css/deliveries.css', 'resources/css/sidebar.css', 'resources/css/pos.css'])

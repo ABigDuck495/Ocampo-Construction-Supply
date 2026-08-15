@@ -17,6 +17,7 @@ export default defineConfig({
                 'resources/js/pages/sidebar.js',
                 'resources/js/pages/inventory.js',
                 'resources/css/inventory.css',
+                'resources/js/pages/printReceipt.js',
 
             ],
             refresh: true,

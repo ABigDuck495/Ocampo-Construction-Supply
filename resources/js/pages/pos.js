@@ -2,6 +2,8 @@
    POS - DATA + LOGIC (wired to backend)
    ============================================================ */
 
+import { printReceipt } from './printReceipt.js'
+
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
 /* ---------------- CATALOG (from PosController@index) ---------------- */
@@ -208,6 +210,7 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
         total: cartTotal(),
         payment: selectedPayment,
         paymentStatus: paymentStatus,
+        date: formatReceiptDate(),
     };
 
     renderReceipt(pendingOrder);
@@ -221,9 +224,13 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
     document.getElementById('receiptOverlay').classList.add('open');
 });
 
+function formatReceiptDate(){
+    return new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+}
+
 function renderReceipt(order){
     const paper = document.getElementById('receiptPaper');
-    const now = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+    const now = order.date || formatReceiptDate();
 
     paper.innerHTML = `
         <h2>Ocampo Construction and Hardware Supplies</h2>
@@ -249,8 +256,66 @@ document.getElementById('receiptBackBtn').addEventListener('click', () => {
     pendingOrder = null;
 });
 
-document.getElementById('printBtn').addEventListener('click', () => {
-    window.print();
+/* ----------------------------------------------------------
+   Build the payload shape printReceipt() sends to the printer.
+   Mirrors renderReceipt()'s on-screen layout field-for-field —
+   same header, same line order, same conditional Address/Notes —
+   so the paper receipt matches what the cashier just saw:
+
+     Ocampo Construction and Hardware Supplies
+     Sual, Pangasinan
+     Date / Customer / Contact / Type
+     Address              (Delivery only)
+     Notes                (only if present)
+     Payment (status)
+     ------------------------------
+     item x qty ...
+     ------------------------------
+     TOTAL
+     ------------------------------
+     Thank you for your purchase!
+   ---------------------------------------------------------- */
+function buildPrintPayload(order){
+    return {
+        store_name: 'Ocampo Construction and Hardware Supplies',
+        store_sub: 'Sual, Pangasinan',
+        date: order.date || formatReceiptDate(),
+        customer_name: order.customer,
+        contact: order.contact,
+        order_type: order.orderType,
+        address: order.orderType === 'Delivery' ? order.address : null,
+        notes: order.notes || null,
+        payment_method: order.payment,
+        payment_status: order.paymentStatus,
+        items: order.items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+        total: order.total,
+        footer: 'Thank you for your purchase!',
+    };
+}
+
+/* ---------------- PRINT (thermal printer, w/ browser-print fallback) ---------------- */
+document.getElementById('printBtn').addEventListener('click', async () => {
+    if(!pendingOrder){
+        window.print();
+        return;
+    }
+
+    const btn = document.getElementById('printBtn');
+    btn.disabled = true;
+    try {
+        const result = await printReceipt(buildPrintPayload(pendingOrder));
+        if(result.status !== 'printed'){
+            console.error('Thermal print failed:', result.message);
+            alert((result.message || 'Thermal print failed.') + ' Falling back to browser print.');
+            window.print();
+        }
+    } catch (err) {
+        console.error('Thermal print error:', err);
+        alert('Could not reach the printer. Falling back to browser print.');
+        window.print();
+    } finally {
+        btn.disabled = false;
+    }
 });
 
 /* ----------------------------------------------------------
@@ -259,13 +324,15 @@ document.getElementById('printBtn').addEventListener('click', () => {
    already saves order items for every item regardless of order type,
    so both buttons post the exact same payload — the only difference
    between them is the label shown and where the browser goes
-   afterward.
+   afterward. Both also fire the same thermal-print call once the
+   sale is confirmed saved.
    ---------------------------------------------------------- */
 async function submitSale(triggerBtn){
     if(!pendingOrder) return;
 
     triggerBtn.disabled = true;
     const wasDelivery = pendingOrder.orderType === 'Delivery';
+    const printPayload = buildPrintPayload(pendingOrder);
 
     try {
         const res = await fetch('/transactions/pos-sale', {
@@ -296,6 +363,20 @@ async function submitSale(triggerBtn){
             alert(err.message || 'Something went wrong processing the sale.');
             triggerBtn.disabled = false;
             return;
+        }
+
+        // Sale is saved server-side — fire the thermal print now. A print
+        // failure shouldn't block the cashier from moving to the next
+        // sale, so this only warns rather than stopping the flow.
+        try {
+            const printResult = await printReceipt(printPayload);
+            if(printResult.status !== 'printed'){
+                console.error('Thermal print failed:', printResult.message);
+                alert((printResult.message || 'Thermal print failed.') + ' You can reprint from the receipt if needed.');
+            }
+        } catch (printErr) {
+            console.error('Thermal print error:', printErr);
+            alert('Sale saved, but could not reach the printer.');
         }
 
         // reset POS state
@@ -342,3 +423,20 @@ document.getElementById('confirmPickupBtn').addEventListener('click', function()
 /* ---------------- INIT ---------------- */
 renderProducts();
 renderCart();
+
+document.getElementById('testPrintBtn')?.addEventListener('click', async () => {
+    const result = await printReceipt(buildPrintPayload({
+        customer: 'Test Customer',
+        contact: '0900-000-0000',
+        orderType: 'Pickup',
+        address: 'Pickup at store',
+        notes: '',
+        payment: 'Cash',
+        paymentStatus: 'Paid',
+        items: [{ name: 'Test Item', qty: 1, price: 100 }],
+        total: 100,
+        date: formatReceiptDate(),
+    }));
+    console.log('Print result:', result);
+    alert(result.status === 'printed' ? 'Printed!' : 'Failed: ' + result.message);
+});
