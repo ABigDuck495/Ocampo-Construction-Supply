@@ -1,8 +1,21 @@
 /**
  * printReceipt.js
- * Handles sending a receipt to whichever printer is configured
- * (network / usb / bluetooth). Network prints resolve server-side;
- * usb and bluetooth get relayed from here in the browser.
+ * Sends a receipt to whichever printer is configured. Network prints
+ * resolve entirely server-side (PrinterController writes raw bytes
+ * straight to the printer's IP/port). USB and Bluetooth thermal
+ * printers are printed via the Web Serial API directly from the
+ * browser — no separate desktop app (QZ Tray, etc.) required.
+ *
+ * Browser support: Web Serial only exists in Chromium browsers
+ * (Chrome, Edge, Brave, Opera) on desktop, and only in a secure
+ * context (https:// or http://localhost / http://127.0.0.1).
+ * Firefox and Safari don't implement it, and it isn't available on
+ * mobile at all.
+ *
+ * First print ever on a given browser profile pops the browser's own
+ * "select a device" picker so the cashier can choose the printer's
+ * COM port. The browser remembers that choice after that — every
+ * print after the first is silent, no prompt.
  *
  * Usage from pos.js:
  *   import { printReceipt } from './printReceipt.js';
@@ -18,54 +31,52 @@ function base64ToBytes(base64) {
     return bytes;
 }
 
-async function printViaQzUsb(usbPrinterName, bytes) {
-    if (typeof qz === 'undefined') {
-        throw new Error('QZ Tray is not loaded. Install/run QZ Tray to print via USB.');
+/* ----------------------------------------------------------
+   Web Serial helpers
+   ---------------------------------------------------------- */
+
+/**
+ * Returns a SerialPort the browser already has permission for, or —
+ * only on the very first print — prompts the cashier to pick one.
+ * Must be called as a direct result of a click, since requestPort()
+ * requires a live user gesture; keep any work before this call to a
+ * minimum so the browser doesn't consider the gesture "stale".
+ */
+async function getSerialPort() {
+    if (!('serial' in navigator)) {
+        throw new Error('This browser can\'t talk to the printer directly. Use Chrome or Edge on desktop.');
     }
-    if (!qz.websocket.isActive()) {
-        await qz.websocket.connect();
+
+    const granted = await navigator.serial.getPorts();
+    if (granted.length > 0) {
+        return granted[0];
     }
-    const config = qz.configs.create(usbPrinterName);
-    const data = [{ type: 'raw', format: 'base64', data: btoa(String.fromCharCode(...bytes)) }];
-    await qz.print(config, data);
+
+    return navigator.serial.requestPort();
 }
 
-async function printViaBluetoothSerial(comPort, bytes) {
-    // Most Bluetooth thermal printers (incl. POS-58BT clones) use classic
-    // SPP, which Windows exposes as a virtual COM port after pairing.
-    // QZ Tray's serial API talks to that COM port directly — this is NOT
-    // the Web Bluetooth API, which only supports BLE devices.
-    if (typeof qz === 'undefined') {
-        throw new Error('QZ Tray is not loaded. Install/run QZ Tray to print via Bluetooth.');
-    }
-    if (!qz.websocket.isActive()) {
-        await qz.websocket.connect();
+async function printViaWebSerial(bytes, baudRate = 9600) {
+    const port = await getSerialPort();
+
+    // Defensively close first in case a previous attempt errored out
+    // before its own close() ran, leaving the port locked open.
+    if (port.readable || port.writable) {
+        try { await port.close(); } catch (err) { /* ignore — likely already closed */ }
     }
 
-    // Defensively close the port first in case a previous attempt errored
-    // out before its own closePort() ran, leaving it locked open.
+    await port.open({ baudRate });
+
+    const writer = port.writable.getWriter();
     try {
-        await qz.serial.closePort(comPort);
-    } catch (err) {
-        // ignore — port likely wasn't open, which is the normal case
-    }
-
-    await qz.serial.openPort(comPort, {
-        baudRate: 9600, // common default for these printers; adjust if yours differs
-    });
-
-    try {
-        await qz.serial.sendData(comPort, {
-            type: 'base64',
-            data: btoa(String.fromCharCode(...bytes)),
-        });
+        await writer.write(bytes);
     } finally {
-        await qz.serial.closePort(comPort);
+        writer.releaseLock();
+        await port.close();
     }
 }
 
 /**
- * @param {Object} order - { printer_id?, items: [{name, qty, price}], total, order_type, customer_name, payment_method }
+ * @param {Object} order - { printer_id?, store_name?, store_sub?, date?, items: [{name, qty, price}], total, order_type, customer_name, contact?, address?, notes?, payment_method, payment_status?, footer? }
  * @returns {Promise<{ status: string, message?: string }>}
  */
 export async function printReceipt(order) {
@@ -94,11 +105,10 @@ export async function printReceipt(order) {
         const bytes = base64ToBytes(result.raw_base64);
 
         try {
-            if (result.connection_type === 'usb') {
-                await printViaQzUsb(result.usb_printer_name, bytes);
-            } else if (result.connection_type === 'bluetooth') {
-                await printViaBluetoothSerial(result.bluetooth_com_port, bytes);
-            }
+            // Both usb and bluetooth thermal printers show up to the OS
+            // as a serial/COM port, so both print the same way now —
+            // connection_type is no longer branched on here.
+            await printViaWebSerial(bytes);
             return { status: 'printed' };
         } catch (err) {
             return { status: 'error', message: err.message };

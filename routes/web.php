@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PrinterController;
 
+
 Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('deliveries.index');
@@ -94,7 +95,7 @@ Route::middleware(['auth'])->group(function () {
     });
         Route::resource('printers', PrinterController::class)->except(['show', 'edit', 'create']);
         Route::post('/api/print-receipt', [PrinterController::class, 'printReceipt'])->name('print-receipt');
-
+ 
     Route::middleware(['role:Admin'])->group(function () {
         Route::resource('users', UserController::class);
     });

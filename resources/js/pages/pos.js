@@ -3,18 +3,17 @@
    ============================================================ */
 
 import { printReceipt } from './printReceipt.js'
+import { toast } from './toast.js'
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
 /* ---------------- CATALOG (from PosController@index) ---------------- */
-// window.POS_DATA.products is injected by the Blade view:
-// each item: { ProductID, Product_Name, Category, Price, inventory: { QuantityOnHand } }
 const rawProducts = (window.POS_DATA && window.POS_DATA.products) || [];
 
 const products = rawProducts.map(p => ({
     id: p.ProductID,
     name: p.Product_Name,
-    cat: p.Category || 'Hardware', // falls back until every product has a Category set
+    cat: p.Category || 'Hardware',
     price: Number(p.Price) || 0,
     stock: p.inventory ? Number(p.inventory.QuantityOnHand) : 0,
 }));
@@ -29,7 +28,7 @@ const icons = {
 function iconFor(cat){ return icons[cat] || icons.Hardware; }
 
 /* ---------------- STATE ---------------- */
-let cart = [];        // [{ id, name, price, qty, stock }]
+let cart = [];
 let activeCat = 'all';
 let selectedPayment = null;
 let orderType = 'Delivery';
@@ -63,7 +62,7 @@ function addToCart(productId){
     const currentQty = existing ? existing.qty : 0;
 
     if(currentQty + 1 > product.stock){
-        alert(`Not enough stock for ${product.name}. Available: ${product.stock}`);
+        toast(`Not enough stock for ${product.name}. Available: ${product.stock}`, 'error');
         return;
     }
 
@@ -77,7 +76,7 @@ function changeQty(productId, delta){
     if(!item) return;
 
     if(delta > 0 && item.qty + 1 > item.stock){
-        alert(`Not enough stock for ${item.name}. Available: ${item.stock}`);
+        toast(`Not enough stock for ${item.name}. Available: ${item.stock}`, 'error');
         return;
     }
 
@@ -186,17 +185,17 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
     const paymentStatus = document.getElementById('custPaymentStatus').value;
     const isPickup = orderType === 'Pickup';
 
-    if(!cart.length){ alert('Cart is empty.'); return; }
+    if(!cart.length){ toast('Cart is empty.', 'error'); return; }
     if(!name || !contact || !paymentStatus){
-        alert('Please fill in customer name, contact number, and payment status before checking out.');
+        toast('Please fill in customer name, contact number, and payment status before checking out.', 'error');
         return;
     }
     if(!isPickup && !address){
-        alert('Please fill in the delivery address before checking out.');
+        toast('Please fill in the delivery address before checking out.', 'error');
         return;
     }
     if(!selectedPayment){
-        alert('Please select a payment method before checking out.');
+        toast('Please select a payment method before checking out.', 'error');
         return;
     }
 
@@ -215,8 +214,6 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
 
     renderReceipt(pendingOrder);
 
-    // Show only the confirm button that matches this order's type —
-    // a Pickup order should never see "SEND TO DELIVERY" and vice versa.
     const isDelivery = orderType === 'Delivery';
     document.getElementById('confirmDeliveryBtn').style.display = isDelivery ? '' : 'none';
     document.getElementById('confirmPickupBtn').style.display = isDelivery ? 'none' : '';
@@ -258,22 +255,6 @@ document.getElementById('receiptBackBtn').addEventListener('click', () => {
 
 /* ----------------------------------------------------------
    Build the payload shape printReceipt() sends to the printer.
-   Mirrors renderReceipt()'s on-screen layout field-for-field —
-   same header, same line order, same conditional Address/Notes —
-   so the paper receipt matches what the cashier just saw:
-
-     Ocampo Construction and Hardware Supplies
-     Sual, Pangasinan
-     Date / Customer / Contact / Type
-     Address              (Delivery only)
-     Notes                (only if present)
-     Payment (status)
-     ------------------------------
-     item x qty ...
-     ------------------------------
-     TOTAL
-     ------------------------------
-     Thank you for your purchase!
    ---------------------------------------------------------- */
 function buildPrintPayload(order){
     return {
@@ -306,12 +287,14 @@ document.getElementById('printBtn').addEventListener('click', async () => {
         const result = await printReceipt(buildPrintPayload(pendingOrder));
         if(result.status !== 'printed'){
             console.error('Thermal print failed:', result.message);
-            alert((result.message || 'Thermal print failed.') + ' Falling back to browser print.');
+            toast((result.message || 'Thermal print failed.') + ' Falling back to browser print.', 'error');
             window.print();
+        } else {
+            toast('Receipt printed.', 'success');
         }
     } catch (err) {
         console.error('Thermal print error:', err);
-        alert('Could not reach the printer. Falling back to browser print.');
+        toast('Could not reach the printer. Falling back to browser print.', 'error');
         window.print();
     } finally {
         btn.disabled = false;
@@ -320,12 +303,7 @@ document.getElementById('printBtn').addEventListener('click', async () => {
 
 /* ----------------------------------------------------------
    Shared sale-confirmation logic used by BOTH the Delivery and
-   Pickup confirm buttons. The backend (TransactionController@posSale)
-   already saves order items for every item regardless of order type,
-   so both buttons post the exact same payload — the only difference
-   between them is the label shown and where the browser goes
-   afterward. Both also fire the same thermal-print call once the
-   sale is confirmed saved.
+   Pickup confirm buttons.
    ---------------------------------------------------------- */
 async function submitSale(triggerBtn){
     if(!pendingOrder) return;
@@ -360,23 +338,22 @@ async function submitSale(triggerBtn){
 
         if(!res.ok){
             const err = await res.json().catch(() => ({}));
-            alert(err.message || 'Something went wrong processing the sale.');
+            toast(err.message || 'Something went wrong processing the sale.', 'error');
             triggerBtn.disabled = false;
             return;
         }
 
-        // Sale is saved server-side — fire the thermal print now. A print
-        // failure shouldn't block the cashier from moving to the next
-        // sale, so this only warns rather than stopping the flow.
         try {
             const printResult = await printReceipt(printPayload);
             if(printResult.status !== 'printed'){
                 console.error('Thermal print failed:', printResult.message);
-                alert((printResult.message || 'Thermal print failed.') + ' You can reprint from the receipt if needed.');
+                toast((printResult.message || 'Thermal print failed.') + ' You can reprint from the receipt if needed.', 'error');
+            } else {
+                toast('Sale saved and receipt printed.', 'success');
             }
         } catch (printErr) {
             console.error('Thermal print error:', printErr);
-            alert('Sale saved, but could not reach the printer.');
+            toast('Sale saved, but could not reach the printer.', 'error');
         }
 
         // reset POS state
@@ -397,9 +374,6 @@ async function submitSale(triggerBtn){
         document.getElementById('custAddress').placeholder = 'Delivery address';
         document.getElementById('receiptOverlay').classList.remove('open');
 
-        // Only a Delivery sale should route to the deliveries board —
-        // Pickup sales are already Completed/Fulfilled, so send the
-        // cashier back to POS (refreshed) to ring up the next customer.
         if (wasDelivery) {
             window.location.href = '/deliveries';
         } else {
@@ -407,7 +381,7 @@ async function submitSale(triggerBtn){
         }
     } catch (err) {
         console.error('POS sale failed:', err);
-        alert('Could not reach the server. Please try again.');
+        toast('Could not reach the server. Please try again.', 'error');
         triggerBtn.disabled = false;
     }
 }
@@ -418,6 +392,46 @@ document.getElementById('confirmDeliveryBtn').addEventListener('click', function
 
 document.getElementById('confirmPickupBtn').addEventListener('click', function(){
     submitSale(this);
+});
+
+/* ---------------- PRINTER CONNECTION ---------------- */
+document.addEventListener('DOMContentLoaded', async () => {
+    const statusEl = document.getElementById('printer-status');
+    const connectBtn = document.getElementById('connect-printer-btn');
+    if (!statusEl || !connectBtn) return;
+
+    function renderPrinterStatus(status) {
+        if (status === 'connected') {
+            statusEl.textContent = 'Printer: PT210 Connected';
+            statusEl.classList.add('connected');
+            connectBtn.style.display = 'none';
+        } else {
+            statusEl.textContent = 'Printer: Not Connected';
+            statusEl.classList.remove('connected');
+            connectBtn.style.display = 'inline-block';
+        }
+    }
+
+    if (!window.pt210 || !window.pt210.isSupported()) {
+        statusEl.textContent = 'Printer: Unsupported browser (use Chrome/Edge)';
+        connectBtn.style.display = 'none';
+        return;
+    }
+
+    window.pt210.onStatusChange = renderPrinterStatus;
+
+    const reconnected = await window.pt210.tryReconnect();
+    renderPrinterStatus(reconnected ? 'connected' : 'disconnected');
+
+    connectBtn.addEventListener('click', async () => {
+        try {
+            await window.pt210.connect();
+            toast('Printer connected.', 'success');
+        } catch (err) {
+            console.error('Printer connection cancelled or failed:', err);
+            toast('Printer connection cancelled or failed.', 'error');
+        }
+    });
 });
 
 /* ---------------- INIT ---------------- */
@@ -438,5 +452,5 @@ document.getElementById('testPrintBtn')?.addEventListener('click', async () => {
         date: formatReceiptDate(),
     }));
     console.log('Print result:', result);
-    alert(result.status === 'printed' ? 'Printed!' : 'Failed: ' + result.message);
+    toast(result.status === 'printed' ? 'Printed!' : 'Failed: ' + result.message, result.status === 'printed' ? 'success' : 'error');
 });

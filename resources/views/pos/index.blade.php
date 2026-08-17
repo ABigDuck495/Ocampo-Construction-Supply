@@ -12,10 +12,6 @@
     };
 </script>
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<script>
-    window.POS_DATA = { products: @json($products) };
-</script>
-<script src="https://cdn.jsdelivr.net/npm/qz-tray/qz-tray.js"></script>
 
 <!-- <button id="testPrintBtn" style="position:fixed; bottom:20px; right:20px; z-index:9999; padding:10px 16px; background:#222; color:#fff; border:none; border-radius:6px; cursor:pointer;">
     TEST PRINT
@@ -81,6 +77,10 @@
         <div>
             <h1>POINT OF SALE</h1>
             <p id="headerSub">Ring up an order, print the receipt, send it to delivery</p>
+        </div>
+        <div class="printer-status-widget">
+            <span id="printer-status">Printer: Checking...</span>
+            <button id="connect-printer-btn" type="button" style="display:none;">Connect Printer</button>
         </div>
         <div class="header-stats">
             <div class="hstat"><b id="statCartItems">0</b><span>ITEMS</span></div>
