@@ -78,6 +78,7 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'Product_Name'   => 'required|string|max:255',
+            'Unit'           => 'required|string|max:50',
             'Category'       => 'required|string|max:255',
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU',
@@ -89,6 +90,7 @@ class InventoryController extends Controller
         return DB::transaction(function () use ($validated) {
             $product = Product::create([
                 'Product_Name' => $validated['Product_Name'],
+                'Unit'         => $validated['Unit'],
                 'Category'     => $validated['Category'],
                 'SubCategory'  => $validated['SubCategory'],
                 'SKU'          => $validated['SKU'] ?? null,
@@ -149,6 +151,7 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'Product_Name'   => 'required|string|max:255',
+            'Unit'           => 'required|string|max:50',
             'Category'       => 'required|string|max:255',
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU,' . $inventory->ProductID . ',ProductID',
@@ -160,6 +163,7 @@ class InventoryController extends Controller
         return DB::transaction(function () use ($validated, $inventory) {
             $inventory->product->update([
                 'Product_Name' => $validated['Product_Name'],
+                'Unit'         => $validated['Unit'],
                 'Category'     => $validated['Category'],
                 'SubCategory'  => $validated['SubCategory'],
                 'SKU'          => $validated['SKU'] ?? null,

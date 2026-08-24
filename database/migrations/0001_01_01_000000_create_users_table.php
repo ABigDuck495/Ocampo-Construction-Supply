@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('Name');
             $table->string('Password');
             $table->enum('Role', ['Admin', 'Staff'])->default('Staff');
+            $table->enum('Status', ['Active', 'Inactive'])->default('Active');
+            $table->timestamp('LastLoginAt')->nullable();
             $table->string('Email')->unique();
             $table->string('PhoneNumber')->nullable();
         });

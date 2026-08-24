@@ -27,6 +27,7 @@ function mapInventoryToProducts(inventories) {
         productId: inv.ProductID,
         name: inv.product ? inv.product.Product_Name : '(unknown product)',
         sku: inv.product ? inv.product.SKU : '',
+        unit: inv.product ? inv.product.Unit : '',
         category: inv.product ? inv.product.Category : 'Tools',
         subCategory: inv.product ? inv.product.SubCategory : '',
         price: inv.product ? Number(inv.product.Price) : 0,
@@ -81,7 +82,7 @@ function renderTable() {
     const rows = getFiltered();
 
     if (!rows.length) {
-        body.innerHTML = `<tr class="empty-row"><td colspan="6">No products match your search.</td></tr>`;
+        body.innerHTML = `<tr class="empty-row"><td colspan="7">No products match your search.</td></tr>`;
         return;
     }
 
@@ -95,6 +96,7 @@ function renderTable() {
                 </td>
                 <td class="sku-cell">${escapeHtml(p.sku)}</td>
                 <td><span class="cat-pill">${icon}${escapeHtml(p.category)}</span></td>
+                <td class="unit-cell">${escapeHtml(p.unit)}</td>
                 <td class="price-cell">${fmtMoney(p.price)}</td>
                 <td><span class="stock-pill ${sCls}">${p.stock}</span></td>
                 <td>

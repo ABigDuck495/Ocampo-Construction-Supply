@@ -41,6 +41,7 @@
         document.getElementById('editFldName').value = btn.dataset.name || '';
         document.getElementById('editFldSku').value = btn.dataset.sku || '';
         document.getElementById('editFldCategory').value = btn.dataset.category || 'Tools';
+        document.getElementById('editFldUnit').value = btn.dataset.unit || '';
         document.getElementById('editFldSubCategory').value = btn.dataset.subcategory || '';
         document.getElementById('editFldPrice').value = btn.dataset.price || '0';
         document.getElementById('editFldStock').value = btn.dataset.stock || '0';
@@ -84,6 +85,8 @@
         row.querySelector('.prod-cell span').textContent = product.Product_Name;
         row.querySelector('.sku-cell').textContent = product.SKU || '';
         row.querySelector('.cat-pill').lastChild.textContent = product.Category;
+        const unitCell = row.querySelector('.unit-cell');
+        if (unitCell) unitCell.textContent = product.Unit || '';
         row.querySelector('.price-cell').textContent = '$' + price.toFixed(2);
 
         const stockPill = row.querySelector('.stock-pill');
@@ -93,6 +96,7 @@
         const editBtn = row.querySelector('.btn-edit');
         editBtn.dataset.name = product.Product_Name;
         editBtn.dataset.sku = product.SKU || '';
+        editBtn.dataset.unit = product.Unit || '';
         editBtn.dataset.category = product.Category;
         editBtn.dataset.subcategory = product.SubCategory;
         editBtn.dataset.price = product.Price;
@@ -110,6 +114,7 @@
         const payload = {
             Product_Name: document.getElementById('editFldName').value.trim(),
             SKU: document.getElementById('editFldSku').value.trim() || undefined,
+            Unit: document.getElementById('editFldUnit').value.trim(),
             Category: document.getElementById('editFldCategory').value,
             SubCategory: document.getElementById('editFldSubCategory').value.trim(),
             Price: document.getElementById('editFldPrice').value,

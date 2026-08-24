@@ -92,6 +92,7 @@
             </td>
             <td class="sku-cell">${escapeHtml(product.SKU)}</td>
             <td><span class="cat-pill">${escapeHtml(product.Category)}</span></td>
+            <td class="unit-cell">${escapeHtml(product.Unit || '')}</td>
             <td class="price-cell">$${price.toFixed(2)}</td>
             <td><span class="${stockPillClass(qty, reorderLevel)}">${qty}</span></td>
             <td class="actions-cell">
@@ -100,6 +101,7 @@
                     data-product-id="${product.ProductID ?? ''}"
                     data-name="${escapeHtml(product.Product_Name)}"
                     data-sku="${escapeHtml(product.SKU)}"
+                    data-unit="${escapeHtml(product.Unit || '')}"
                     data-category="${escapeHtml(product.Category)}"
                     data-subcategory="${escapeHtml(product.SubCategory)}"
                     data-price="${product.Price}"
@@ -144,6 +146,7 @@
         const payload = {
             Product_Name: document.getElementById('fldName').value.trim(),
             SKU: document.getElementById('fldSku').value.trim() || undefined,
+            Unit: document.getElementById('fldUnit').value.trim(),
             Category: document.getElementById('fldCategory').value,
             SubCategory: document.getElementById('fldSubCategory').value.trim(),
             Price: document.getElementById('fldPrice').value,
