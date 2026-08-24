@@ -2,20 +2,11 @@
  * printReceipt.js
  * Sends a receipt to whichever printer is configured. Network prints
  * resolve entirely server-side (PrinterController writes raw bytes
- * straight to the printer's IP/port). USB and Bluetooth thermal
- * printers are printed via the Web Serial API directly from the
- * browser — no separate desktop app (QZ Tray, etc.) required.
- *
- * Browser support: Web Serial only exists in Chromium browsers
- * (Chrome, Edge, Brave, Opera) on desktop, and only in a secure
- * context (https:// or http://localhost / http://127.0.0.1).
- * Firefox and Safari don't implement it, and it isn't available on
- * mobile at all.
- *
- * First print ever on a given browser profile pops the browser's own
- * "select a device" picker so the cashier can choose the printer's
- * COM port. The browser remembers that choice after that — every
- * print after the first is silent, no prompt.
+ * straight to the printer's IP/port). USB/Bluetooth thermal prints
+ * are written through window.pt210 (see pt210-printer.js) — that
+ * module owns the one shared Web Serial connection for the whole
+ * app, including the header's Connect/status indicator, so printing
+ * here never opens its own separate port.
  *
  * Usage from pos.js:
  *   import { printReceipt } from './printReceipt.js';
@@ -31,48 +22,35 @@ function base64ToBytes(base64) {
     return bytes;
 }
 
-/* ----------------------------------------------------------
-   Web Serial helpers
-   ---------------------------------------------------------- */
-
 /**
- * Returns a SerialPort the browser already has permission for, or —
- * only on the very first print — prompts the cashier to pick one.
- * Must be called as a direct result of a click, since requestPort()
- * requires a live user gesture; keep any work before this call to a
- * minimum so the browser doesn't consider the gesture "stale".
+ * Writes bytes to the printer via the shared pt210 connection.
+ * Does NOT prompt for a new device — requestPort() needs a direct,
+ * fresh user gesture, and by the time this runs we're already a few
+ * awaits deep inside a click handler (past the /api/print-receipt
+ * fetch), so that gesture may no longer count. Instead:
+ *   1. If already connected, just write.
+ *   2. If not, try a silent reconnect (uses a previously-granted
+ *      port, no prompt) — covers "page was refreshed" etc.
+ *   3. If still not connected, fail with a message pointing the
+ *      cashier at the header's "Connect Printer" button, which is
+ *      the one place a fresh picker prompt is safe to trigger.
  */
-async function getSerialPort() {
-    if (!('serial' in navigator)) {
+async function writeViaPt210(bytes) {
+    if (!window.pt210) {
+        throw new Error('Printer module did not load. Refresh the page and try again.');
+    }
+    if (!window.pt210.isSupported()) {
         throw new Error('This browser can\'t talk to the printer directly. Use Chrome or Edge on desktop.');
     }
 
-    const granted = await navigator.serial.getPorts();
-    if (granted.length > 0) {
-        return granted[0];
+    if (!window.pt210.isConnected()) {
+        const reconnected = await window.pt210.tryReconnect();
+        if (!reconnected) {
+            throw new Error('Printer not connected. Click "Connect Printer" at the top of the page first.');
+        }
     }
 
-    return navigator.serial.requestPort();
-}
-
-async function printViaWebSerial(bytes, baudRate = 9600) {
-    const port = await getSerialPort();
-
-    // Defensively close first in case a previous attempt errored out
-    // before its own close() ran, leaving the port locked open.
-    if (port.readable || port.writable) {
-        try { await port.close(); } catch (err) { /* ignore — likely already closed */ }
-    }
-
-    await port.open({ baudRate });
-
-    const writer = port.writable.getWriter();
-    try {
-        await writer.write(bytes);
-    } finally {
-        writer.releaseLock();
-        await port.close();
-    }
+    await window.pt210.write(bytes);
 }
 
 /**
@@ -105,10 +83,7 @@ export async function printReceipt(order) {
         const bytes = base64ToBytes(result.raw_base64);
 
         try {
-            // Both usb and bluetooth thermal printers show up to the OS
-            // as a serial/COM port, so both print the same way now —
-            // connection_type is no longer branched on here.
-            await printViaWebSerial(bytes);
+            await writeViaPt210(bytes);
             return { status: 'printed' };
         } catch (err) {
             return { status: 'error', message: err.message };

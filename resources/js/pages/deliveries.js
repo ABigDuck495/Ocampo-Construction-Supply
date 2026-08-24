@@ -2,6 +2,9 @@
    DELIVERY OPS - DATA + LOGIC (wired to backend)
    ============================================================ */
 
+import { printReceipt } from './printReceipt.js';
+import '../pt210-printer.js';
+
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
 /* ---------------- DATA (from DispatchController@index) ----------------
@@ -311,6 +314,8 @@ function injectAssignModalStyles(){
         .doa-receipt-total{display:flex;justify-content:space-between;font-size:13px;font-weight:800;letter-spacing:.3px;}
         .doa-receipt-footer{text-align:center;font-size:10px;letter-spacing:2px;color:#93897c;margin-top:16px;}
         .doa-receipt-close{width:100%;margin-top:16px;}
+        .doa-receipt-actions{display:flex;gap:8px;margin-top:16px;}
+        .doa-receipt-actions .doa-receipt-close{margin-top:0;}
     `;
     document.head.appendChild(style);
 }
@@ -654,6 +659,32 @@ async function markReturned(truckId){
     }
 }
 
+/* ----------------------------------------------------------
+   Builds the payload printReceipt() sends to the printer for a
+   Delivery Ops order. Deliberately leaves out price/total — this
+   page never had pricing data to begin with (order.total is always
+   0 here), so the printed receipt matches what's actually shown in
+   the on-screen RECEIPT modal: items + qty, no dollar amounts.
+   ---------------------------------------------------------- */
+function buildDeliveryPrintPayload(order){
+    const addressLine = order.orderType === 'Pickup' ? 'Pickup at store' : (order.address || '');
+
+    return {
+        store_name: 'Ocampo Construction and Hardware Supplies',
+        store_sub: 'Sual, Pangasinan',
+        date: new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' }),
+        customer_name: order.customer,
+        contact: order.contact,
+        order_type: order.orderType || 'Delivery',
+        address: addressLine || null,
+        notes: order.notes || null,
+        payment_status: order.paymentStatus || null,
+        items: order.items.map(i => ({ name: i.name, qty: i.qty })), // no price — not tracked on this page
+        total: null,
+        footer: 'Thank you for your business!',
+    };
+}
+
 function viewReceipt(orderId){
     const o = orders.find(x=>x.id===orderId);
     if(!o) return;
@@ -690,7 +721,10 @@ function viewReceipt(orderId){
             <div class="doa-receipt-divider"></div>
             <div class="doa-receipt-total"><span>PAYMENT STATUS</span><span>${o.paymentStatus || 'N/A'}</span></div>
             <div class="doa-receipt-footer">THANK YOU FOR YOUR BUSINESS</div>
-            <button class="btn btn-dispatch doa-receipt-close" id="rcptCloseBtn">CLOSE</button>
+            <div class="doa-receipt-actions">
+                <button class="btn-ghost doa-receipt-close" id="rcptPrintBtn">PRINT</button>
+                <button class="btn btn-dispatch doa-receipt-close" id="rcptCloseBtn">CLOSE</button>
+            </div>
         </div>`;
     document.body.appendChild(overlay);
     injectAssignModalStyles();
@@ -699,6 +733,26 @@ function viewReceipt(orderId){
     overlay.querySelector('#rcptClose').addEventListener('click', close);
     overlay.querySelector('#rcptCloseBtn').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if(e.target === overlay) close(); });
+
+    const printBtn = overlay.querySelector('#rcptPrintBtn');
+    printBtn.addEventListener('click', async () => {
+        printBtn.disabled = true;
+        const originalLabel = printBtn.textContent;
+        printBtn.textContent = 'PRINTING…';
+        try {
+            const result = await printReceipt(buildDeliveryPrintPayload(o));
+            if (result.status !== 'printed') {
+                console.error('Delivery receipt print failed:', result.message);
+                alert(result.message || 'Could not print the receipt.');
+            }
+        } catch (err) {
+            console.error('Delivery receipt print error:', err);
+            alert('Could not print the receipt.');
+        } finally {
+            printBtn.disabled = false;
+            printBtn.textContent = originalLabel;
+        }
+    });
 }
 
 /* ---------------- TABS ---------------- */
