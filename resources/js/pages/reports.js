@@ -1,46 +1,22 @@
 /* ============================================================
    REPORTS - DATA + LOGIC
-
-   Data is expected to be injected from the backend (e.g. via a
-   Blade @json() seed rendered into `window.reportsData` in
-   reports.blade.php, or fetched from a Laravel controller/API
-   endpoint) before this script runs. No mock data is defined
-   here — populate window.reportsData server-side, or wire up
-   an API call in loadReportsData() below.
-
-   Expected shape:
-   window.reportsData = {
-       salesStats: { totalRevenue, totalOrders, avgOrderValue, topCategory },
-       topProducts: [{ name, unitsSold, percent }, ...],
-       recentSales: [{ id, customer, items, total, payment, paymentStatus, date }, ...],
-       deliveryHistory: [{ id, customer, truck, driver, status, dispatched, delivered, payment }, ...],
-   }
+   Filtered by Month/Year + Report Type (orders | items) selectors.
    ============================================================ */
 
 let salesStats = { totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, topCategory: '—' };
 let topProducts = [];
 let recentSales = [];
+let itemsOrdered = [];
 let deliveryHistory = [];
-
-function loadReportsData(){
-    const data = window.reportsData;
-    if(!data) return;
-    salesStats = data.salesStats || salesStats;
-    topProducts = data.topProducts || [];
-    recentSales = data.recentSales || [];
-    deliveryHistory = data.deliveryHistory || [];
-}
 
 function fmt(n){ return '$' + Number(n || 0).toFixed(2); }
 
 /* ---------------- RENDER: SALES SUMMARY ---------------- */
 function renderSalesStats(){
-    // header strip
     document.getElementById('statTotalRevenue').textContent = fmt(salesStats.totalRevenue);
     document.getElementById('statTotalOrders').textContent = salesStats.totalOrders;
     document.getElementById('statAvgOrder').textContent = fmt(salesStats.avgOrderValue);
 
-    // stat cards (sales summary view)
     document.getElementById('cardRevenue').textContent = fmt(salesStats.totalRevenue);
     document.getElementById('cardOrders').textContent = salesStats.totalOrders;
     document.getElementById('cardAvg').textContent = fmt(salesStats.avgOrderValue);
@@ -86,6 +62,23 @@ function renderRecentSales(){
         </tr>`).join('');
 }
 
+/* ---------------- RENDER: ITEMS ORDERED ---------------- */
+function renderItemsOrdered(){
+    const body = document.getElementById('itemsOrderedBody');
+    if(!body) return; // panel not present in DOM yet
+    if(!itemsOrdered.length){
+        body.innerHTML = `<tr><td colspan="4" class="empty-state">NO ITEMS RECORDED</td></tr>`;
+        return;
+    }
+    body.innerHTML = itemsOrdered.map(i => `
+        <tr>
+            <td>${i.productName}</td>
+            <td class="cell-dim">${i.category}</td>
+            <td class="cell-dim">${i.unitsSold}</td>
+            <td class="cell-total">${fmt(i.revenue)}</td>
+        </tr>`).join('');
+}
+
 /* ---------------- RENDER: DELIVERY HISTORY ---------------- */
 function badgeForDeliveryStatus(status){
     const map = { transit:'TRANSIT', delivered:'DELIVERED', returned:'RETURNED' };
@@ -110,6 +103,93 @@ function renderDeliveryHistory(){
         </tr>`).join('');
 }
 
+/* ---------------- FILTER STATE HELPERS ---------------- */
+function currentReportType(){
+    const el = document.getElementById('filterReportType');
+    return el ? el.value : 'orders';
+}
+
+function currentFilterParams(){
+    return new URLSearchParams({
+        month: document.getElementById('filterMonth').value,
+        year: document.getElementById('filterYear').value,
+        type: currentReportType(),
+    });
+}
+
+function populateYearOptions(){
+    const yearSelect = document.getElementById('filterYear');
+    const currentYear = new Date().getFullYear();
+    const startYear = currentYear - 5;
+    for (let y = currentYear; y >= startYear; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearSelect.appendChild(opt);
+    }
+}
+
+/* ---------------- PANEL TOGGLE (Customer Orders vs Items Ordered) ---------------- */
+function toggleReportTypePanels(){
+    const type = currentReportType();
+    const ordersPanel = document.getElementById('panel-recentSales');
+    const itemsPanel = document.getElementById('panel-itemsOrdered');
+    if(!ordersPanel || !itemsPanel) return;
+
+    if(type === 'items'){
+        ordersPanel.style.display = 'none';
+        itemsPanel.style.display = '';
+    } else {
+        ordersPanel.style.display = '';
+        itemsPanel.style.display = 'none';
+    }
+}
+
+/* ---------------- FETCH FROM BACKEND ---------------- */
+async function fetchReportsData(){
+    try {
+        const res = await fetch(`/reports/data?${currentFilterParams()}`);
+        if(!res.ok) throw new Error('Failed to load report data');
+        const data = await res.json();
+
+        salesStats = data.salesStats;
+        topProducts = data.topProducts;
+        recentSales = data.recentSales;
+        itemsOrdered = data.itemsOrdered || [];
+        deliveryHistory = data.deliveryHistory;
+
+        renderSalesStats();
+        renderTopProducts();
+        renderRecentSales();
+        renderItemsOrdered();
+        renderDeliveryHistory();
+        toggleReportTypePanels();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+/* ---------------- EXPORTS ---------------- */
+function buildExportUrl(base){
+    return `${base}?${currentFilterParams()}`;
+}
+
+document.getElementById('btnGenerateReport').addEventListener('click', fetchReportsData);
+document.getElementById('btnExportPdf').addEventListener('click', () => {
+    window.location.href = buildExportUrl('/reports/export/pdf');
+});
+document.getElementById('btnExportCsv').addEventListener('click', () => {
+    window.location.href = buildExportUrl('/reports/export/csv');
+});
+
+const filterReportTypeEl = document.getElementById('filterReportType');
+if(filterReportTypeEl){
+    filterReportTypeEl.addEventListener('change', () => {
+        toggleReportTypePanels();
+        fetchReportsData();
+    });
+}
+
 /* ---------------- TABS ---------------- */
 document.getElementById('reportTabs').addEventListener('click', e => {
     const tab = e.target.closest('.tab');
@@ -124,8 +204,10 @@ document.getElementById('reportTabs').addEventListener('click', e => {
 });
 
 /* ---------------- INIT ---------------- */
-loadReportsData();
-renderSalesStats();
-renderTopProducts();
-renderRecentSales();
-renderDeliveryHistory();
+populateYearOptions();
+const today = new Date();
+document.getElementById('filterMonth').value = today.getMonth() + 1;
+document.getElementById('filterYear').value = today.getFullYear();
+
+toggleReportTypePanels();
+fetchReportsData();
