@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('usb_printer_name')->nullable();
             $table->string('bluetooth_service_uuid')->nullable();
             $table->string('bluetooth_characteristic_uuid')->nullable();
+            $table->string('bluetooth_com_port')->nullable();
             $table->boolean('is_active')->default(true);
             $table->boolean('is_default')->default(false);
             $table->timestamps();

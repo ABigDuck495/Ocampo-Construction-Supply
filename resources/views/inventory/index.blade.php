@@ -122,6 +122,7 @@
                     <th class="col-product">PRODUCT</th>
                     <th>SKU</th>
                     <th>CATEGORY</th>
+                    <th>UNIT</th>
                     <th>PRICE</th>
                     <th>STOCK</th>
                     <th>ACTIONS</th>
@@ -163,6 +164,10 @@
                                 <option value="Safety">Safety</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="fldUnit">Unit (e.g. pcs, bag, litre)</label>
+                        <input type="text" id="fldUnit" name="Unit" required>
                     </div>
                     <div class="form-row">
                         <label for="fldSubCategory">Sub-Category</label>
@@ -238,6 +243,10 @@
                             <label for="editFldStock">Quantity On Hand</label>
                             <input type="number" id="editFldStock" name="QuantityOnHand" min="0" required>
                         </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="editFldUnit">Unit</label>
+                        <input type="text" id="editFldUnit" name="Unit" required>
                     </div>
                     <div class="form-row">
                         <label for="editFldReorderLevel">Reorder Level</label>
