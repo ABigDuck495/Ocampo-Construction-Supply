@@ -84,7 +84,7 @@
         </div>
         <div class="header-stats">
             <div class="hstat"><b id="statCartItems">0</b><span>ITEMS</span></div>
-            <div class="hstat"><b id="statCartTotal">$0.00</b><span>TOTAL</span></div>
+            <div class="hstat"><b id="statCartTotal">₱0.00</b><span>TOTAL</span></div>
         </div>
     </div>
 
@@ -110,8 +110,8 @@
             <div class="cart-items" id="cartItems"></div>
 
             <div class="cart-summary">
-                <div class="cart-row"><span>Subtotal</span><span id="cartSubtotal">$0.00</span></div>
-                <div class="cart-row total"><span>Total</span><span id="cartTotal">$0.00</span></div>
+                <div class="cart-row"><span>Subtotal</span><span id="cartSubtotal">₱0.00</span></div>
+                <div class="cart-row total"><span>Total</span><span id="cartTotal">₱0.00</span></div>
             </div>
 
             <div class="order-type-toggle" id="orderTypeToggle">

@@ -128,7 +128,7 @@
 
         if (statValue) {
             const current = parseFloat(statValue.textContent.replace(/[^0-9.]/g, '')) || 0;
-            statValue.textContent = '$' + (current + price * qty).toFixed(2);
+            statValue.textContent = '₱' + (current + price * qty).toFixed(2);
         }
 
         if (qty <= 0 && statOut) {

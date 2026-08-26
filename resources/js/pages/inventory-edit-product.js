@@ -6,9 +6,10 @@
 // the form — no extra fetch needed since that data is already on the page.
 //
 // PUTs to InventoryController@updateWithProduct, which updates the
-// Product AND Inventory rows together in one DB transaction. The URL is
-// built from the form's data-update-url-template attribute by swapping
-// in the row's inventory ID for the "__ID__" placeholder.
+// Product row (name/sku/category/subcategory/price/unit/reorder level).
+// QuantityOnHand is intentionally NOT editable here — stock can only be
+// changed by recording a transaction (sale, delivery, restock, etc.),
+// never by direct edit.
 //
 // Response shape (Inventory model with product loaded):
 // {
@@ -44,7 +45,6 @@
         document.getElementById('editFldUnit').value = btn.dataset.unit || '';
         document.getElementById('editFldSubCategory').value = btn.dataset.subcategory || '';
         document.getElementById('editFldPrice').value = btn.dataset.price || '0';
-        document.getElementById('editFldStock').value = btn.dataset.stock || '0';
         document.getElementById('editFldReorderLevel').value = btn.dataset.reorderLevel || '';
 
         errorBox.classList.remove('show');
@@ -73,6 +73,11 @@
         if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
     });
 
+    // Note: QuantityOnHand/stock is deliberately left untouched here.
+    // The PUT response still contains the current QuantityOnHand (unchanged
+    // by this endpoint), so the stock pill is refreshed from that value
+    // purely to stay in sync with ReorderLevel edits, not because stock
+    // itself was modified.
     function updateRowInPlace(inventory) {
         const row = productBody.querySelector(`tr[data-inventory-id="${inventory.InventoryID}"]`);
         if (!row) return;
@@ -87,7 +92,7 @@
         row.querySelector('.cat-pill').lastChild.textContent = product.Category;
         const unitCell = row.querySelector('.unit-cell');
         if (unitCell) unitCell.textContent = product.Unit || '';
-        row.querySelector('.price-cell').textContent = '$' + price.toFixed(2);
+        row.querySelector('.price-cell').textContent = '₱' + price.toFixed(2);
 
         const stockPill = row.querySelector('.stock-pill');
         stockPill.textContent = qty;
@@ -100,8 +105,10 @@
         editBtn.dataset.category = product.Category;
         editBtn.dataset.subcategory = product.SubCategory;
         editBtn.dataset.price = product.Price;
-        editBtn.dataset.stock = inventory.QuantityOnHand;
         editBtn.dataset.reorderLevel = inventory.ReorderLevel;
+        // NOTE: editBtn.dataset.stock is intentionally left as-is —
+        // it's not part of this form anymore and stays whatever the
+        // transaction system last set it to.
     }
 
     form.addEventListener('submit', async (e) => {
@@ -118,7 +125,6 @@
             Category: document.getElementById('editFldCategory').value,
             SubCategory: document.getElementById('editFldSubCategory').value.trim(),
             Price: document.getElementById('editFldPrice').value,
-            QuantityOnHand: document.getElementById('editFldStock').value,
             ReorderLevel: document.getElementById('editFldReorderLevel').value || undefined,
         };
 

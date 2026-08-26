@@ -34,7 +34,7 @@ let activeCat = 'all';
 let selectedPayment = null;
 let orderType = 'Delivery';
 
-function fmt(n){ return '$' + Number(n).toFixed(2); }
+function fmt(n){ return '₱' + Number(n).toFixed(2); }
 
 /* ---------------- RENDER: PRODUCTS ---------------- */
 function renderProducts(){

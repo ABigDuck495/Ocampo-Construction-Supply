@@ -61,7 +61,13 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('drivers', DriverController::class);
         Route::resource('trucks', TruckController::class);
         Route::resource('transactions', TransactionController::class);
-        Route::resource('reports', ReportController::class);
+        // NOTE: Route::resource('reports', ReportController::class) intentionally removed.
+        // It registered GET /reports/{report}, which matched BEFORE the explicit
+        // /reports/data and /reports/summary routes below (Laravel matches top to
+        // bottom), swallowing "data" and "summary" as fake {report} IDs and causing
+        // 404s. All report-related actions actually used (index/data/summary/export/
+        // generate-now/for-date/trend) are already declared explicitly further down,
+        // so the resource route wasn't needed.
         Route::resource('users', UserController::class);
         Route::resource('pos', PosController::class);
         Route::get('products/search', [ProductController::class, 'search']);
@@ -95,11 +101,11 @@ Route::middleware(['auth'])->group(function () {
     });
         Route::resource('printers', PrinterController::class)->except(['show', 'edit', 'create']);
         Route::post('/api/print-receipt', [PrinterController::class, 'printReceipt'])->name('print-receipt');
-        Route::get('/reports/data', [ReportController::class, 'data'])->name('reports.data');
-        Route::get('/reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');
-        Route::get('/reports/export/csv', [ReportController::class, 'exportCsv'])->name('reports.export.csv');
-        Route::get('/reports/items', [ReportController::class, 'itemsOrdered']);
-        Route::get('/reports/items/export', [ReportController::class, 'exportItemsCsv']);
+        Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/data', [ReportController::class, 'data']);
+        Route::get('/reports/summary', [ReportController::class, 'summary']);
+        Route::get('/reports/export/pdf', [ReportController::class, 'exportPdf']);
+        Route::get('/reports/export/csv', [ReportController::class, 'exportCsv']);
  
     Route::middleware(['role:Admin'])->group(function () {
         Route::resource('users', UserController::class);

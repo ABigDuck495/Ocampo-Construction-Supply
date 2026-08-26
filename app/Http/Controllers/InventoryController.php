@@ -143,9 +143,13 @@ class InventoryController extends Controller
 
     /**
      * Update the Product's own fields (name/SKU/category/subcategory/price)
-     * AND its Inventory row (quantity/reorder level) together — the
+     * AND its Inventory row (reorder level only) together — the
      * counterpart to storeWithProduct(), used by the inventory page's
      * EDIT button/modal.
+     *
+     * QuantityOnHand is intentionally NOT accepted here — stock can only
+     * be changed via adjust() (Restock/Correction/Damage transactions),
+     * never through a direct product edit.
      */
     public function updateWithProduct(Request $request, Inventory $inventory)
     {
@@ -156,7 +160,6 @@ class InventoryController extends Controller
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU,' . $inventory->ProductID . ',ProductID',
             'Price'          => 'required|numeric|min:0.01',
-            'QuantityOnHand' => 'required|integer|min:0',
             'ReorderLevel'   => 'nullable|integer|min:0',
         ]);
 
@@ -171,8 +174,7 @@ class InventoryController extends Controller
             ]);
 
             $inventory->update([
-                'QuantityOnHand' => $validated['QuantityOnHand'],
-                'ReorderLevel'   => $validated['ReorderLevel'] ?? $inventory->ReorderLevel,
+                'ReorderLevel' => $validated['ReorderLevel'] ?? $inventory->ReorderLevel,
             ]);
 
             return $inventory->fresh()->load('product');

@@ -92,7 +92,7 @@ const svg = {
     note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>',
 };
 
-function fmt(n){ return '$' + Number(n || 0).toFixed(2); }
+function fmt(n){ return '₱' + Number(n || 0).toFixed(2); }
 function cargoOf(order){ return order.items.reduce((s,i)=>s + (parseFloat(i.qty) || 0), 0); }
 function truckCargo(truck){
     return orders.filter(o=>o.truck===truck.id).reduce((s,o)=>s+cargoOf(o),0);
