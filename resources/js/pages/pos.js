@@ -4,6 +4,7 @@
 
 import { printReceipt } from './printReceipt.js'
 import { toast } from './toast.js'
+import '../pt210-printer.js'
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
@@ -414,7 +415,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!window.pt210 || !window.pt210.isSupported()) {
         statusEl.textContent = 'Printer: Unsupported browser (use Chrome/Edge)';
-        connectBtn.style.display = 'none';
+        connectBtn.textContent = 'Chrome/Edge Required';
+        connectBtn.disabled = true;
         return;
     }
 

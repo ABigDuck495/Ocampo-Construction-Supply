@@ -20,6 +20,30 @@
     --red:#ff5c5c;
 }
 
+/* ---------- LIGHT MODE OVERRIDES ----------
+   Toggled by sidebar.js via body.classList.toggle('light-mode', ...).
+   Every component that uses the vars above (stat-cards, panel-box,
+   data-table, filter-bar, order/truck cards, etc.) picks this up
+   automatically — no per-component light-mode rules needed.
+*/
+body.light-mode{
+    --bg:#f4f5f7;
+    --panel:#ffffff;
+    --panel-alt:#eef0f3;
+    --border:#d8dbe2;
+    --text:#1a1c22;
+    --text-dim:#5b6072;
+    --text-faint:#8b8f9c;
+    --orange:#e08a1a;
+    --orange-dark:#c9840f;
+    --orange-glow:rgba(224,138,26,.3);
+    --blue:#1c5fc4;
+    --blue-dark:#164a9a;
+    --green:#1f8c39;
+    --green-dark:#186e2d;
+    --red:#d63f3f;
+}
+
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
@@ -28,6 +52,7 @@ body{
     font-family:'JetBrains Mono', ui-monospace, monospace;
     min-height:100vh;
     display:flex;
+    transition:background .15s ease, color .15s ease;
 }
 
 /* ============================================================
@@ -73,7 +98,7 @@ body{
     cursor:pointer;
     user-select:none;
 }
-.tab.active{background:#fff;color:#111;border-color:#000;box-shadow:2px 2px 0 #000;}
+.tab.active{background:var(--panel);color:var(--text);border-color:#000;box-shadow:2px 2px 0 #000;}
 .hint{font-size:10px;color:var(--text-faint);letter-spacing:.08em;margin-bottom:12px;font-weight:600;text-transform:uppercase;}
 
 .board{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start;}
@@ -229,4 +254,3 @@ body{
 .tc-departed{font-size:9px;color:var(--text-faint);text-align:center;letter-spacing:.04em;}
 
 .empty-state{font-size:11px;color:var(--text-faint);text-align:center;padding:30px 0;letter-spacing:.03em;}
-    

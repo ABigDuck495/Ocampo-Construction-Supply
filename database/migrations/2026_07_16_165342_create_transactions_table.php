@@ -1,7 +1,8 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -17,11 +18,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("
-            ALTER TABLE transactions
-            MODIFY PaymentMethod ENUM('COD', 'GCash', 'Card', 'Bank Transfer')
-            NOT NULL DEFAULT 'COD'
-        ");
+        Schema::create('transactions', function (Blueprint $table) {
+            $table->id('TransactionID');
+            $table->unsignedBigInteger('OrderID');
+            $table->timestamp('TransactionDate')->nullable();
+            $table->decimal('Amount', 10, 2)->default(0);
+            $table->enum('PaymentMethod', ['COD', 'GCash', 'Card', 'Bank Transfer'])->default('COD');
+            $table->timestamps();
+            $table->foreign('OrderID')->references('OrderID')->on('orders')->onDelete('cascade');
+        });
     }
 
     /**
@@ -29,10 +34,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("
-            ALTER TABLE transactions
-            MODIFY PaymentMethod ENUM('Cash', 'Credit', 'Cash On Delivery')
-            NOT NULL DEFAULT 'Cash On Delivery'
-        ");
+        Schema::dropIfExists('transactions');
     }
 };

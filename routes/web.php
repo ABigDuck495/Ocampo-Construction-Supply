@@ -95,6 +95,11 @@ Route::middleware(['auth'])->group(function () {
     });
         Route::resource('printers', PrinterController::class)->except(['show', 'edit', 'create']);
         Route::post('/api/print-receipt', [PrinterController::class, 'printReceipt'])->name('print-receipt');
+        Route::get('/reports/data', [ReportController::class, 'data'])->name('reports.data');
+        Route::get('/reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');
+        Route::get('/reports/export/csv', [ReportController::class, 'exportCsv'])->name('reports.export.csv');
+        Route::get('/reports/items', [ReportController::class, 'itemsOrdered']);
+        Route::get('/reports/items/export', [ReportController::class, 'exportItemsCsv']);
  
     Route::middleware(['role:Admin'])->group(function () {
         Route::resource('users', UserController::class);

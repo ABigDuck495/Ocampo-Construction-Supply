@@ -111,34 +111,45 @@ class PrinterController extends Controller
         if (!empty($order['payment_method'])) {
             $statusSuffix = !empty($order['payment_status']) ? " ({$order['payment_status']})" : '';
             $printer->text("Payment: {$order['payment_method']}{$statusSuffix}\n");
+        } elseif (!empty($order['payment_status'])) {
+            // Fallback for receipts with no payment_method (e.g. Delivery Ops,
+            // which has no cash/GCash/etc. concept - only a Paid/Unpaid status).
+            // Keeps payment status visible on the printed receipt even though
+            // it's not a POS-style transaction.
+            $printer->text("Payment Status: {$order['payment_status']}\n");
         }
 
         $printer->text("--------------------------------\n");
 
         // ---- Items ----
         foreach ($order['items'] as $item) {
-            $lineTotal = $item['qty'] * $item['price'];
-
-            // Line 1: item name inline with quantity
+            // Line 1: item name inline with quantity — always present.
             $printer->text(sprintf("%s x%d\n", $item['name'], $item['qty']));
 
-            // Line 2: unit price on the left, line total (qty * price) on the right
-            $printer->text(sprintf(
-                "%-20s %11s\n",
-                '@ ' . number_format($item['price'], 2),
-                number_format($lineTotal, 2)
-            ));
+            // Line 2: unit price / line total — only when pricing data was
+            // actually sent. Delivery Ops receipts don't carry prices, so
+            // this is skipped there rather than printing a fake $0.00.
+            if (isset($item['price'])) {
+                $lineTotal = $item['qty'] * $item['price'];
+                $printer->text(sprintf(
+                    "%-20s %11s\n",
+                    '@ ' . number_format($item['price'], 2),
+                    number_format($lineTotal, 2)
+                ));
+            }
         }
 
         $printer->text("--------------------------------\n");
 
-        // ---- Total ----
-        $printer->setJustification(EscPrinter::JUSTIFY_RIGHT);
-        $printer->setEmphasis(true);
-        $printer->text("TOTAL: " . number_format($order['total'], 2) . "\n");
-        $printer->setEmphasis(false);
+        // ---- Total (optional — only when the caller sent one) ----
+        if (isset($order['total']) && $order['total'] !== null) {
+            $printer->setJustification(EscPrinter::JUSTIFY_RIGHT);
+            $printer->setEmphasis(true);
+            $printer->text("TOTAL: " . number_format($order['total'], 2) . "\n");
+            $printer->setEmphasis(false);
 
-        $printer->text("--------------------------------\n");
+            $printer->text("--------------------------------\n");
+        }
 
         // ---- Footer ----
         $printer->setJustification(EscPrinter::JUSTIFY_CENTER);
@@ -164,7 +175,7 @@ class PrinterController extends Controller
         $request->validate([
             'printer_id' => 'nullable|exists:printers,id',
             'items' => 'required|array|min:1',
-            'total' => 'required|numeric',
+            'total' => 'nullable|numeric',
         ]);
 
         $printer = $request->printer_id

@@ -80,7 +80,7 @@
         </div>
         <div class="printer-status-widget">
             <span id="printer-status">Printer: Checking...</span>
-            <button id="connect-printer-btn" type="button" style="display:none;">Connect Printer</button>
+            <button id="connect-printer-btn" type="button">Connect Printer</button>
         </div>
         <div class="header-stats">
             <div class="hstat"><b id="statCartItems">0</b><span>ITEMS</span></div>
