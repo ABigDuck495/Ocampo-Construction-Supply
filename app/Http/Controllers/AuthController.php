@@ -34,9 +34,14 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         if ($request->expectsJson()) {
+            // NEW: issue a Sanctum token so the Flutter app can authenticate
+            // future requests without relying on session cookies.
+            $token = $user->createToken('flutter-app')->plainTextToken;
+
             return response()->json([
                 'message' => 'Logged in successfully.',
                 'user' => $user,
+                'token' => $token, // NEW
             ]);
         }
 
@@ -44,6 +49,12 @@ class AuthController extends Controller
     }
 
     public function logout(Request $request){
+        // NEW: revoke the current Sanctum token if this request was
+        // authenticated with one (i.e. came from the Flutter app).
+        if ($request->user() && $request->user()->currentAccessToken()) {
+            $request->user()->currentAccessToken()->delete();
+        }
+
         Auth::logout();
 
         $request->session()->invalidate();
