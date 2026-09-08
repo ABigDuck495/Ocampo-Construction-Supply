@@ -14,6 +14,8 @@
         };
     </script>
 
+    @include('partials.system_settings_js')
+
     <!-- sidebar.css loads BEFORE the page-specific stylesheet, same as reports.blade,
         so inventory.css can safely override without fighting the shared .main rules -->
     @vite(['resources/css/sidebar.css', 'resources/css/inventory.css'])
@@ -173,10 +175,14 @@
                         <label for="fldSubCategory">Sub-Category</label>
                         <input type="text" id="fldSubCategory" name="SubCategory" placeholder="e.g. Cement, Pipes, Nails" required>
                     </div>
-                    <div class="form-row-split">
+                        <div class="form-row-split">
                         <div class="form-row">
                             <label for="fldPrice">Price (₱)</label>
-                            <input type="number" id="fldPrice" name="Price" step="0.01" min="0" required>
+                            <input type="number" id="fldPrice" name="Price" step="0.01" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label for="fldVariablePricing">Variable price</label>
+                            <input type="checkbox" id="fldVariablePricing" name="Pricing_type" value="Variable">
                         </div>
                         <div class="form-row">
                             <label for="fldStock">Quantity On Hand</label>
@@ -238,7 +244,11 @@
                     </div>
                     <div class="form-row">
                         <label for="editFldPrice">Price (₱)</label>
-                        <input type="number" id="editFldPrice" name="Price" step="0.01" min="0" required>
+                        <input type="text" id="editFldPrice" name="Price">
+                    </div>
+                    <div class="form-row">
+                        <label for="editFldVariablePricing">Variable price</label>
+                        <input type="checkbox" id="editFldVariablePricing" name="Pricing_type" value="Variable">
                     </div>
                     <div class="form-row">
                         <label for="editFldUnit">Unit</label>

@@ -44,7 +44,8 @@
         document.getElementById('editFldCategory').value = btn.dataset.category || 'Tools';
         document.getElementById('editFldUnit').value = btn.dataset.unit || '';
         document.getElementById('editFldSubCategory').value = btn.dataset.subcategory || '';
-        document.getElementById('editFldPrice').value = btn.dataset.price || '0';
+        document.getElementById('editFldPrice').value = btn.dataset.price || '';
+        document.getElementById('editFldVariablePricing').checked = (btn.dataset.pricingType || 'Fixed') === 'Variable';
         document.getElementById('editFldReorderLevel').value = btn.dataset.reorderLevel || '';
 
         errorBox.classList.remove('show');
@@ -86,13 +87,14 @@
         const qty = Number(inventory.QuantityOnHand);
         const reorderLevel = Number(inventory.ReorderLevel);
         const price = Number(product.Price);
+        const isVariable = product.Pricing_type === 'Variable' || product.Price === null || product.Price === undefined;
 
         row.querySelector('.prod-cell span').textContent = product.Product_Name;
         row.querySelector('.sku-cell').textContent = product.SKU || '';
         row.querySelector('.cat-pill').lastChild.textContent = product.Category;
         const unitCell = row.querySelector('.unit-cell');
         if (unitCell) unitCell.textContent = product.Unit || '';
-        row.querySelector('.price-cell').textContent = '₱' + price.toFixed(2);
+        row.querySelector('.price-cell').innerHTML = isVariable ? '<span class="var-price">Variable</span>' : '₱' + price.toFixed(2);
 
         const stockPill = row.querySelector('.stock-pill');
         stockPill.textContent = qty;
@@ -104,7 +106,8 @@
         editBtn.dataset.unit = product.Unit || '';
         editBtn.dataset.category = product.Category;
         editBtn.dataset.subcategory = product.SubCategory;
-        editBtn.dataset.price = product.Price;
+        editBtn.dataset.price = product.Price ?? '';
+        editBtn.dataset.pricingType = product.Pricing_type ?? 'Fixed';
         editBtn.dataset.reorderLevel = inventory.ReorderLevel;
         // NOTE: editBtn.dataset.stock is intentionally left as-is —
         // it's not part of this form anymore and stays whatever the
@@ -124,7 +127,8 @@
             Unit: document.getElementById('editFldUnit').value.trim(),
             Category: document.getElementById('editFldCategory').value,
             SubCategory: document.getElementById('editFldSubCategory').value.trim(),
-            Price: document.getElementById('editFldPrice').value,
+            Price: document.getElementById('editFldPrice').value || null,
+            Pricing_type: document.getElementById('editFldVariablePricing').checked ? 'Variable' : 'Fixed',
             ReorderLevel: document.getElementById('editFldReorderLevel').value || undefined,
         };
 

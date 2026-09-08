@@ -82,19 +82,25 @@ class InventoryController extends Controller
             'Category'       => 'required|string|max:255',
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU',
-            'Price'          => 'required|numeric|min:0.01',
+            'Price'          => 'nullable|numeric|min:0',
+            'Pricing_type'   => ['nullable', 'string'],
             'QuantityOnHand' => 'required|integer|min:0',
             'ReorderLevel'   => 'nullable|integer|min:0',
         ]);
 
         return DB::transaction(function () use ($validated) {
+            $pricingType = $validated['Pricing_type'] ?? (isset($validated['Price']) ? 'Fixed' : 'Variable');
+            $pricingStatus = ($pricingType === 'Variable') ? 'Unresolved' : 'Resolved';
+
             $product = Product::create([
-                'Product_Name' => $validated['Product_Name'],
-                'Unit'         => $validated['Unit'],
-                'Category'     => $validated['Category'],
-                'SubCategory'  => $validated['SubCategory'],
-                'SKU'          => $validated['SKU'] ?? null,
-                'Price'        => $validated['Price'],
+                'Product_Name'   => $validated['Product_Name'],
+                'Unit'           => $validated['Unit'],
+                'Category'       => $validated['Category'],
+                'SubCategory'    => $validated['SubCategory'],
+                'SKU'            => $validated['SKU'] ?? null,
+                'Price'          => $validated['Price'] ?? null,
+                'Pricing_type'   => $pricingType,
+                'Pricing_status' => $pricingStatus,
             ]);
 
             $inventory = Inventory::create([
@@ -159,18 +165,24 @@ class InventoryController extends Controller
             'Category'       => 'required|string|max:255',
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU,' . $inventory->ProductID . ',ProductID',
-            'Price'          => 'required|numeric|min:0.01',
+            'Price'          => 'nullable|numeric|min:0',
+            'Pricing_type'   => ['nullable', 'string'],
             'ReorderLevel'   => 'nullable|integer|min:0',
         ]);
 
         return DB::transaction(function () use ($validated, $inventory) {
+            $pricingType = $validated['Pricing_type'] ?? (isset($validated['Price']) ? 'Fixed' : $inventory->product->Pricing_type ?? 'Fixed');
+            $pricingStatus = ($pricingType === 'Variable') ? 'Unresolved' : 'Resolved';
+
             $inventory->product->update([
-                'Product_Name' => $validated['Product_Name'],
-                'Unit'         => $validated['Unit'],
-                'Category'     => $validated['Category'],
-                'SubCategory'  => $validated['SubCategory'],
-                'SKU'          => $validated['SKU'] ?? null,
-                'Price'        => $validated['Price'],
+                'Product_Name'   => $validated['Product_Name'],
+                'Unit'           => $validated['Unit'],
+                'Category'       => $validated['Category'],
+                'SubCategory'    => $validated['SubCategory'],
+                'SKU'            => $validated['SKU'] ?? null,
+                'Price'          => $validated['Price'] ?? null,
+                'Pricing_type'   => $pricingType,
+                'Pricing_status' => $pricingStatus,
             ]);
 
             $inventory->update([

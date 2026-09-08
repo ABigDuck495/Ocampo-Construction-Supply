@@ -26,7 +26,11 @@ class DeliveryController extends Controller
 
     $trucks = Truck::with(['dispatches.drivers'])->get();
 
-    return view('deliveries.index', compact('orders', 'trucks'));
+    $systemSettings = \Illuminate\Support\Facades\DB::table('system_settings')
+            ->pluck('Setting_Value', 'Setting_Key')
+            ->toArray();
+
+    return view('deliveries.index', compact('orders', 'trucks', 'systemSettings'));
 }
 
     /**

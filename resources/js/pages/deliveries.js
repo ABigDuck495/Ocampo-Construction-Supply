@@ -13,6 +13,8 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
    ------------------------------------------------------------------- */
 const rawOrderItems = (window.DISPATCH_DATA && window.DISPATCH_DATA.orders) || [];
 const rawTrucks = (window.DISPATCH_DATA && window.DISPATCH_DATA.trucks) || [];
+const SYS = (window.SYSTEM_SETTINGS) ? window.SYSTEM_SETTINGS : {};
+const TRUCK_CAPACITY_TRACKING = SYS.enable_truck_capacity_tracking === 'true';
 
 function groupOrderItems(items) {
     const map = {};
@@ -330,7 +332,7 @@ function openAssignModal(orderId, truckId){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
     if(!order || !truck) return;
 
-    const remainingCapacity = truck.capacity - truckCargo(truck);
+    const remainingCapacity = TRUCK_CAPACITY_TRACKING ? truck.capacity - truckCargo(truck) : Number.POSITIVE_INFINITY;
 
     const rows = order.items.map((item, idx) => `
         <div class="doa-item-row">
@@ -362,7 +364,11 @@ function openAssignModal(orderId, truckId){
     function currentCargo(){
         return Array.from(overlay.querySelectorAll('.doa-qty-input')).reduce((s, inp) => s + (parseFloat(inp.value) || 0), 0);
     }
-    function updateCapNote(){
+        function updateCapNote(){
+        if (!TRUCK_CAPACITY_TRACKING) {
+            overlay.querySelector('#doaCapNote').textContent = '';
+            return;
+        }
         const cargo = currentCargo();
         const note = overlay.querySelector('#doaCapNote');
         note.textContent = `${cargo}/${remainingCapacity} of remaining truck capacity`;
@@ -381,7 +387,7 @@ function openAssignModal(orderId, truckId){
         }));
         const cargo = chosen.reduce((s, c) => s + c.qty, 0);
         if(cargo <= 0){ alert('Pick at least one item to send.'); return; }
-        if(cargo > remainingCapacity){ alert(`${truck.name} doesn't have enough capacity left for this selection.`); return; }
+        if (TRUCK_CAPACITY_TRACKING && cargo > remainingCapacity){ alert(`${truck.name} doesn't have enough capacity left for this selection.`); return; }
         close();
         applyPasabaySplit(order, truck, chosen);
     });

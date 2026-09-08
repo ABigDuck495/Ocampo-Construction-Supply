@@ -15,7 +15,11 @@ return new class extends Migration
             $table->string('Unit');
             $table->string('SubCategory');
             $table->string('SKU', 100)->nullable()->unique();
-            $table->decimal('Price', 10, 2)->default(0);
+            // Price nullable to allow "Variable" products; store as decimal when available
+            $table->decimal('Price', 12, 2)->nullable();
+            // Pricing type: Fixed or Variable. Pricing status indicates whether a price has been resolved.
+            $table->enum('Pricing_type', ['Fixed', 'Variable'])->default('Fixed');
+            $table->enum('Pricing_status', ['Resolved', 'Unresolved'])->default('Resolved');
             $table->timestamps();
         });
     }

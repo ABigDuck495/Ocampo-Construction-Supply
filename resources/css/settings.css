@@ -1,0 +1,197 @@
+.settings-flash {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.85rem 1.1rem;
+    margin-bottom: 1.25rem;
+    border-radius: 6px;
+    background: var(--accent-soft, rgba(34, 197, 94, 0.12));
+    border: 1px solid var(--accent, #22c55e);
+    color: var(--text, #e5e5e5);
+}
+
+.settings-flash.error {
+    background: var(--danger-soft, rgba(239, 68, 68, 0.12));
+    border-color: var(--danger, #ef4444);
+}
+
+.settings-flash.error ul {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.settings-group {
+    margin-bottom: 1.75rem;
+}
+
+.settings-group-head h2 {
+    font-family: 'Press Start 2P', 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted, #9a9a9a);
+    margin: 0 0 0.75rem 0;
+}
+
+.settings-card {
+    background: var(--card, #161616);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.setting-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border, #2a2a2a);
+}
+
+.setting-row:last-child {
+    border-bottom: none;
+}
+
+.setting-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.setting-label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: capitalize;
+    color: var(--text, #e5e5e5);
+    cursor: pointer;
+}
+
+.setting-desc {
+    margin: 0.3rem 0 0 0;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--text-muted, #9a9a9a);
+    max-width: 52ch;
+}
+
+.setting-control {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    min-width: 120px;
+    justify-content: flex-end;
+}
+
+.setting-input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.7rem;
+    width: 160px;
+    border-radius: 6px;
+    border: 1px solid var(--border, #2a2a2a);
+    background: var(--bg, #0d0d0d);
+    color: var(--text, #e5e5e5);
+}
+
+.setting-input:focus {
+    outline: none;
+    border-color: var(--accent, #22c55e);
+}
+
+.setting-input-number {
+    width: 110px;
+    text-align: right;
+}
+
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border, #3a3a3a);
+    border-radius: 999px;
+    transition: background 0.15s ease;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+}
+
+.toggle input:checked + .toggle-slider {
+    background: var(--accent, #22c55e);
+}
+
+.toggle input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+.toggle input:focus-visible + .toggle-slider {
+    outline: 2px solid var(--accent, #22c55e);
+    outline-offset: 2px;
+}
+
+/* --- Save bar --- */
+
+.settings-savebar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1rem 0;
+    margin-top: 0.5rem;
+    background: linear-gradient(to top, var(--bg, #0d0d0d) 60%, transparent);
+}
+
+.settings-savebar-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted, #9a9a9a);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.settings-savebar-hint.dirty {
+    color: var(--accent, #22c55e);
+}
+
+.settings-savebar #settingsSaveBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    .setting-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .setting-control {
+        justify-content: flex-start;
+    }
+
+    .setting-input {
+        width: 100%;
+    }
+}

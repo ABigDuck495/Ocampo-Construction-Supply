@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController as LoginController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DispatchController;
@@ -8,16 +9,16 @@ use App\Http\Controllers\DriverController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderItemController;
+use App\Http\Controllers\PosController;
+use App\Http\Controllers\PrinterController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TruckController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\AuthController as LoginController;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
-use App\Http\Controllers\PosController;
-use App\Http\Controllers\PrinterController;
+use Illuminate\Support\Facades\Route;
 
 
 Route::get('/', function () {
@@ -99,6 +100,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('users/{user}/activity', [UserController::class, 'activity'])->name('users.activity');
         Route::put('inventories/{inventory}/update-with-product', [InventoryController::class, 'updateWithProduct'])->name('inventory.updateWithProduct');
     });
+        Route::resource('settings', SettingsController::class);
         Route::resource('printers', PrinterController::class)->except(['show', 'edit', 'create']);
         Route::post('/api/print-receipt', [PrinterController::class, 'printReceipt'])->name('print-receipt');
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

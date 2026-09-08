@@ -17,12 +17,16 @@ class OrderItem extends Model
         'ProductID',
         'Quantity',
         'Status',
+        'UnitPrice',
+        'Pricing_method',
+        'Pricing_status',
     ];
     protected $guarded = ['OrderItemID'];
     protected $casts = [
         'OrderID' => 'integer',
         'ProductID' => 'integer',
-        'Quantity' => 'integer',
+        'Quantity' => 'float',
+        'UnitPrice' => 'float',
     ];
 
     public function order(){
@@ -75,7 +79,8 @@ class OrderItem extends Model
         return $query->where('Status', self::STATUS_COMPLETED);
     }
     public function subtotal() {
-        return (float) $this->Quantity * $this->product->UnitPrice;
+        $unit = $this->UnitPrice ?? $this->product?->UnitPrice;
+        return (float) $this->Quantity * (float) ($unit ?? 0);
     }
     public function quantityDispatched() {
         return $this->relationLoaded('dispatches')

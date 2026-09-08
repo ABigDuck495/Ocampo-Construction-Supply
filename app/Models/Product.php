@@ -19,6 +19,8 @@ class Product extends Model
         'Category',
         'SubCategory',
         'Price',
+        'Pricing_type',
+        'Pricing_status',
     ];
 
     public function inventory(){
@@ -38,5 +40,19 @@ class Product extends Model
     }
     public function isOutOfStock() {
         return $this->inventory && $this->inventory->QuantityOnHand <= 0;
+    }
+
+    // Returns numeric unit price when available, or null for variable pricing
+    public function getUnitPriceAttribute()
+    {
+        if (isset($this->attributes['Price']) && is_numeric($this->attributes['Price'])) {
+            return (float) $this->attributes['Price'];
+        }
+        return null;
+    }
+
+    public function isVariablePricing(): bool
+    {
+        return isset($this->attributes['Pricing_type']) && $this->attributes['Pricing_type'] === 'Variable';
     }
 }

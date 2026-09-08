@@ -17,15 +17,25 @@ class PosController extends Controller
         // pos.js's `p.inventory ? Number(p.inventory.QuantityOnHand) : 0`
         // always falls back to 0.
         $products = Product::with('inventory')->get();
-        return view('pos.index', compact('products'));
+        $systemSettings = 
+            DB::table('system_settings')
+                ->pluck('Setting_Value', 'Setting_Key')
+                ->toArray();
+
+        return view('pos.index', compact('products', 'systemSettings'));
     }
 
     public function posSale(Request $request){
-        $validated = $request->validate([
+        $systemSettings = DB::table('system_settings')
+                ->pluck('Setting_Value', 'Setting_Key')
+                ->toArray();
+
+        $allowUnresolved = ($systemSettings['allow_unresolved_price_checkout'] ?? 'false') === 'true';
+
+        $rules = [
             'items' => 'required|array|min:1',
             'items.*.ProductID' => 'required|exists:products,ProductID',
             'items.*.Quantity' => 'required|string|max:50',
-            'items.*.UnitPrice' => 'required|numeric|min:0',
             'PaymentMethod' => 'required|in:COD,GCash,Card,Bank Transfer',
             'OrderType' => 'required|in:Delivery,Pickup',
             'CustomerName' => 'required|string',
@@ -33,15 +43,25 @@ class PosController extends Controller
             'Address' => 'nullable|string',
             'Notes' => 'nullable|string',
             'PaymentStatus' => 'required|in:Paid,Unpaid',
-        ]);
+        ];
+
+        if ($allowUnresolved) {
+            $rules['items.*.UnitPrice'] = 'nullable|numeric|min:0';
+        } else {
+            $rules['items.*.UnitPrice'] = 'required|numeric|min:0';
+        }
+
+        $validated = $request->validate($rules);
 
         $isPickup = $validated['OrderType'] === 'Pickup';
+
+        $inventoryTrackingEnabled = ($systemSettings['enable_inventory_tracking'] ?? 'true') === 'true';
 
         return DB::transaction(function () use ($validated, $isPickup) {
             foreach ($validated['items'] as $item) {
                 $product = Product::findOrFail($item['ProductID']);
                 $qtyValue = (float) $item['Quantity'];
-                if (($product->inventory?->QuantityOnHand ?? 0) < $qtyValue) {
+                if ($inventoryTrackingEnabled && (($product->inventory?->QuantityOnHand ?? 0) < $qtyValue)) {
                     abort(422, "Insufficient stock for {$product->Product_Name}.");
                 }
             }
@@ -71,7 +91,9 @@ class PosController extends Controller
                 // FIX: deduct stock for EVERY sale, not just Pickup, and
                 // call the method that actually exists on the Inventory
                 // model (deductQuantity, not deduct).
-                Product::find($item['ProductID'])->inventory?->deductQuantity($qtyValue);
+                if ($inventoryTrackingEnabled) {
+                    Product::find($item['ProductID'])->inventory?->deductQuantity($qtyValue);
+                }
 
                 $total += $qtyValue * $item['UnitPrice'];
             }
