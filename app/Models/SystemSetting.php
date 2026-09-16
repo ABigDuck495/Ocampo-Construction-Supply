@@ -77,20 +77,21 @@ class SystemSetting extends Model
  
     public static function grouped(): \Illuminate\Support\Collection
     {
+        
         $groupOrder = ['General', 'Inventory', 'Logistics', 'POS', 'Printer'];
-
+      
         // Use the actual DB column names for ordering/grouping (migration uses PascalCase)
         return static::query()
             ->orderBy('Setting_Group')
             ->orderBy('Setting_Key')
-            ->get()
+            
             ->groupBy(function (self $setting) {
                 return $setting->getAttribute('Setting_Group') ?? 'General';
             })
             ->sortBy(function ($settings, $group) use ($groupOrder) {
                 $pos = array_search($group, $groupOrder, true);
                 return $pos === false ? count($groupOrder) : $pos;
-            });
+            })->get();
     }
 
  

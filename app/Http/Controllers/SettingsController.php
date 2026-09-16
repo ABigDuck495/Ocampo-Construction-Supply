@@ -13,9 +13,10 @@ class SettingsController extends Controller
 {
     public function index(): View
     {
+        
         try {
             $groupedSettings = SystemSetting::grouped();
-
+        
             // also expose settings map to JS like other pages
             $systemSettings = \Illuminate\Support\Facades\DB::table('System_Settings')
                 ->pluck('Setting_Value', 'Setting_Key')
