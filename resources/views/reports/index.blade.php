@@ -9,6 +9,7 @@
 
     <!-- Shared stylesheets (same design system as POS / Delivery Ops) -->
     @vite(['resources/css/deliveries.css', 'resources/css/sidebar.css', 'resources/css/reports.css'])
+    @include('partials.system_settings_js')
     </head>
     <body>
 
@@ -67,11 +68,15 @@
                 <h1>REPORTS</h1>
                 <p>Sales performance &amp; delivery history</p>
             </div>
-            <div class="header-stats">
-                <div class="hstat"><b id="statTotalRevenue">$0.00</b><span>REVENUE</span></div>
-                <div class="hstat"><b id="statTotalOrders">0</b><span>ORDERS</span></div>
-                <div class="hstat"><b id="statAvgOrder">$0.00</b><span>AVG ORDER</span></div>
-            </div>
+            <div class="header-stats" id="headerStats">
+    <div class="header-month-picker">
+        <select id="headerMonth"></select>
+        <select id="headerYear"></select>
+    </div>
+    <div class="hstat"><b id="statTotalRevenue">₱0.00</b><span>REVENUE</span></div>
+    <div class="hstat"><b id="statTotalOrders">0</b><span>ORDERS</span></div>
+    <div class="hstat"><b id="statAvgOrder">₱0.00</b><span>AVG ORDER</span></div>
+</div>
         </div>
 
         <div class="tabs" id="reportTabs">
@@ -120,7 +125,7 @@
     <div class="stat-cards">
         <div class="stat-card">
             <div class="stat-card-label">TOTAL REVENUE</div>
-            <div class="stat-card-value orange" id="cardRevenue">$0.00</div>
+            <div class="stat-card-value orange" id="cardRevenue">₱0.00</div>
             <div class="stat-card-sub" id="cardRevenueRange">—</div>
         </div>
         <div class="stat-card">
@@ -130,7 +135,7 @@
         </div>
         <div class="stat-card">
             <div class="stat-card-label">AVG ORDER VALUE</div>
-            <div class="stat-card-value blue" id="cardAvg">$0.00</div>
+            <div class="stat-card-value blue" id="cardAvg">₱0.00</div>
             <div class="stat-card-sub">Per transaction</div>
         </div>
         <div class="stat-card">

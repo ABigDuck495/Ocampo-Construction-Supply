@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -54,10 +55,15 @@ class OrderController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
+                // Determine pricing defaults from the product
+                $product = Product::find($item['ProductID']);
                 $order->orderItems()->create([
                     'ProductID' => $item['ProductID'],
                     'Quantity' => $item['Quantity'],
                     'Status' => 'Pending',
+                    'UnitPrice' => $product?->UnitPrice,
+                    'Pricing_method' => ($product && $product->isVariablePricing()) ? 'Variable' : 'Fixed',
+                    'Pricing_status' => ($product && $product->isVariablePricing()) ? 'Unresolved' : 'Resolved',
                 ]);
             }
 
@@ -132,10 +138,14 @@ class OrderController extends Controller
                 $order->orderItems()->delete();
 
                 foreach ($validated['items'] as $item) {
+                    $product = Product::find($item['ProductID']);
                     $order->orderItems()->create([
                         'ProductID' => $item['ProductID'],
                         'Quantity' => $item['Quantity'],
                         'Status' => 'Pending',
+                        'UnitPrice' => $product?->UnitPrice,
+                        'Pricing_method' => ($product && $product->isVariablePricing()) ? 'Variable' : 'Fixed',
+                        'Pricing_status' => ($product && $product->isVariablePricing()) ? 'Unresolved' : 'Resolved',
                     ]);
                 }
             }

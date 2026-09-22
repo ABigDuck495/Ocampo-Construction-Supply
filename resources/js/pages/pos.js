@@ -10,14 +10,35 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
 /* ---------------- CATALOG (from PosController@index) ---------------- */
 const rawProducts = (window.POS_DATA && window.POS_DATA.products) || [];
+const SYS = (window.SYSTEM_SETTINGS) ? window.SYSTEM_SETTINGS : {};
+const INVENTORY_TRACKING_ENABLED = SYS.enable_inventory_tracking === 'true';
+
+// small helper to tolerate different API shapes
+function valOf(obj, ...keys){
+    for(const k of keys) if(obj && (k in obj) && obj[k] !== undefined) return obj[k];
+    return undefined;
+}
 
 const products = rawProducts.map(p => ({
-    id: p.ProductID,
-    name: p.Product_Name,
-    cat: p.Category || 'Hardware',
-    price: Number(p.Price) || 0,
-    stock: p.inventory ? Number(p.inventory.QuantityOnHand) : 0,
+    id: valOf(p, 'ProductID', 'id'),
+    name: valOf(p, 'Product_Name', 'ProductName', 'name') || 'Item',
+    cat: valOf(p, 'Category', 'category') || 'Hardware',
+    price: (function(){
+        const v = valOf(p, 'Price', 'price', 'UnitPrice', 'Product_Price');
+        if (v === null || v === undefined) return null;
+        const n = Number(v);
+        return Number.isNaN(n) ? 0 : n;
+    })(),
+    pricingType: valOf(p, 'Pricing_type', 'pricing_type', 'pricingType') || 'Fixed',
+    stock: Number(valOf(p, 'inventory', 'Inventory')?.QuantityOnHand ?? valOf(p, 'QuantityOnHand', 'quantity', 'Stock') ?? 0),
+    subCategory: valOf(p, 'SubCategory', 'subCategory') || '',
 }));
+
+function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str ?? '';
+    return d.innerHTML;
+}
 
 const icons = {
     Tools:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
@@ -34,23 +55,49 @@ let activeCat = 'all';
 let selectedPayment = null;
 let orderType = 'Delivery';
 
-function fmt(n){ return '$' + Number(n).toFixed(2); }
+function fmt(n){ return '₱' + Number(n).toFixed(2); }
 
 /* ---------------- RENDER: PRODUCTS ---------------- */
 function renderProducts(){
     const grid = document.getElementById('productGrid');
     const list = activeCat === 'all' ? products : products.filter(p => p.cat === activeCat);
 
-    grid.innerHTML = list.map(p => `
+    grid.innerHTML = list.map(p => {
+        const priceHtml = (p.pricingType === 'Variable' || p.price === null) ?
+            `<select class="price-select" data-id="${p.id}"><option value="">Variable</option><option value="resolve">Enter Price...</option></select>` :
+            `<div class="product-price">${fmt(p.price)}</div>`;
+        return `
         <div class="product-card" data-id="${p.id}">
             <div class="product-icon">${iconFor(p.cat)}</div>
             <div class="product-name">${p.name}</div>
-            <div class="product-cat">${p.cat}</div>
-            <div class="product-price">${fmt(p.price)}</div>
-        </div>`).join('');
+            <div class="product-cat">${escapeHtml(p.cat)}${p.subCategory ? ' · ' + escapeHtml(p.subCategory) : ''}</div>
+            ${priceHtml}
+            ${INVENTORY_TRACKING_ENABLED ? `<div class="product-stock">Stock: ${p.stock}</div>` : ''}
+        </div>`;
+    }).join('');
 
     grid.querySelectorAll('.product-card').forEach(card => {
         card.addEventListener('click', () => addToCart(card.dataset.id));
+    });
+
+    // Price select handler for variable pricing: allow quick resolve or leave variable
+    grid.querySelectorAll('.price-select').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+            const id = sel.dataset.id;
+            if (sel.value === 'resolve') {
+                const val = prompt('Enter unit price (PHP):');
+                const num = val ? Number(val) : null;
+                if (num && num >= 0) {
+                    // Update local product price for this session so cart picks it up
+                    const prod = products.find(x => String(x.id) === String(id));
+                    if (prod) { prod.price = num; prod.pricingType = 'Fixed'; }
+                    sel.replaceWith(`<div class="product-price">${fmt(num)}</div>`);
+                } else {
+                    alert('Invalid price entered.');
+                    sel.value = '';
+                }
+            }
+        });
     });
 }
 
@@ -62,13 +109,13 @@ function addToCart(productId){
     const existing = cart.find(c => String(c.id) === String(productId));
     const currentQty = existing ? existing.qty : 0;
 
-    if(currentQty + 1 > product.stock){
+    if(INVENTORY_TRACKING_ENABLED && currentQty + 1 > product.stock){
         toast(`Not enough stock for ${product.name}. Available: ${product.stock}`, 'error');
         return;
     }
 
     if(existing){ existing.qty += 1; }
-    else { cart.push({ id: product.id, name: product.name, price: product.price, qty: 1, stock: product.stock }); }
+    else { cart.push({ id: product.id, name: product.name, price: product.price, qty: 1, stock: product.stock, pricingType: product.pricingType || 'Fixed' }); }
     renderCart();
 }
 
@@ -76,7 +123,7 @@ function changeQty(productId, delta){
     const item = cart.find(c => String(c.id) === String(productId));
     if(!item) return;
 
-    if(delta > 0 && item.qty + 1 > item.stock){
+    if(INVENTORY_TRACKING_ENABLED && delta > 0 && item.qty + 1 > item.stock){
         toast(`Not enough stock for ${item.name}. Available: ${item.stock}`, 'error');
         return;
     }
@@ -119,7 +166,7 @@ function renderCart(){
                         <span class="qty-val">${i.qty}</span>
                         <button class="qty-btn" data-inc="${i.id}">+</button>
                     </div>
-                    <div class="ci-price">${fmt(i.price * i.qty)}</div>
+                    <div class="ci-price">${(i.price === null || i.pricingType === 'Variable') ? 'Variable' : fmt(i.price * i.qty)}</div>
                 </div>
             </div>`).join('');
     }
@@ -137,23 +184,36 @@ function renderCart(){
 }
 
 /* ---------------- CATEGORY TABS ---------------- */
-document.getElementById('categoryTabs').addEventListener('click', e => {
-    const tab = e.target.closest('.tab');
-    if(!tab) return;
-    activeCat = tab.dataset.cat;
-    document.querySelectorAll('#categoryTabs .tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    renderProducts();
-});
+function buildCategoryTabs(){
+    const tabs = document.getElementById('categoryTabs');
+    if(!tabs) return;
+    const preferred = Object.keys(icons);
+    const cats = Array.from(new Set(products.map(p => p.cat))).filter(Boolean);
+    cats.sort((a,b) => {
+        const ia = preferred.indexOf(a);
+        const ib = preferred.indexOf(b);
+        if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+        return a.localeCompare(b);
+    });
+    tabs.innerHTML = `<div class="tab active" data-cat="all">ALL</div>` + cats.map(c => `\n<div class="tab" data-cat="${escapeHtml(c)}">${escapeHtml(c.toUpperCase())}</div>`).join('');
+
+    tabs.addEventListener('click', e => {
+        const tab = e.target.closest('.tab');
+        if(!tab) return;
+        activeCat = tab.dataset.cat;
+        document.querySelectorAll('#categoryTabs .tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderProducts();
+    });
+}
 
 /* ---------------- CLEAR CART ---------------- */
-document.getElementById('clearCartBtn').addEventListener('click', () => {
-    cart = [];
-    renderCart();
-});
+const _clearCartBtn = document.getElementById('clearCartBtn');
+if(_clearCartBtn) _clearCartBtn.addEventListener('click', () => { cart = []; renderCart(); });
 
 /* ---------------- ORDER TYPE (DELIVERY / PICKUP) ---------------- */
-document.getElementById('orderTypeToggle').addEventListener('click', e => {
+const _orderTypeToggle = document.getElementById('orderTypeToggle');
+if(_orderTypeToggle) _orderTypeToggle.addEventListener('click', e => {
     const opt = e.target.closest('.type-option');
     if(!opt) return;
     orderType = opt.dataset.type;
@@ -161,13 +221,14 @@ document.getElementById('orderTypeToggle').addEventListener('click', e => {
     opt.classList.add('selected');
 
     const isPickup = orderType === 'Pickup';
-    document.getElementById('addressGroup').style.display = isPickup ? 'none' : '';
-    document.getElementById('detailsTitle').textContent = isPickup ? 'PICKUP DETAILS' : 'DELIVERY DETAILS';
-    document.getElementById('custAddress').placeholder = isPickup ? '' : 'Delivery address';
+    const addrGroup = document.getElementById('addressGroup'); if(addrGroup) addrGroup.style.display = isPickup ? 'none' : '';
+    const detailsTitle = document.getElementById('detailsTitle'); if(detailsTitle) detailsTitle.textContent = isPickup ? 'PICKUP DETAILS' : 'DELIVERY DETAILS';
+    const custAddr = document.getElementById('custAddress'); if(custAddr) custAddr.placeholder = isPickup ? '' : 'Delivery address';
 });
 
 /* ---------------- PAYMENT METHOD ---------------- */
-document.getElementById('paymentOptions').addEventListener('click', e => {
+const _paymentOptions = document.getElementById('paymentOptions');
+if(_paymentOptions) _paymentOptions.addEventListener('click', e => {
     const opt = e.target.closest('.payment-option');
     if(!opt) return;
     selectedPayment = opt.dataset.payment;
@@ -178,12 +239,18 @@ document.getElementById('paymentOptions').addEventListener('click', e => {
 /* ---------------- CHECKOUT / RECEIPT ---------------- */
 let pendingOrder = null;
 
-document.getElementById('checkoutBtn').addEventListener('click', () => {
-    const name = document.getElementById('custName').value.trim();
-    const contact = document.getElementById('custContact').value.trim();
-    const address = document.getElementById('custAddress').value.trim();
-    const notes = document.getElementById('custNotes').value.trim();
-    const paymentStatus = document.getElementById('custPaymentStatus').value;
+const _checkoutBtn = document.getElementById('checkoutBtn');
+if(_checkoutBtn) _checkoutBtn.addEventListener('click', () => {
+    const nameEl = document.getElementById('custName');
+    const contactEl = document.getElementById('custContact');
+    const addressEl = document.getElementById('custAddress');
+    const notesEl = document.getElementById('custNotes');
+    const paymentStatusEl = document.getElementById('custPaymentStatus');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const contact = contactEl ? contactEl.value.trim() : '';
+    const address = addressEl ? addressEl.value.trim() : '';
+    const notes = notesEl ? notesEl.value.trim() : '';
+    const paymentStatus = paymentStatusEl ? paymentStatusEl.value : '';
     const isPickup = orderType === 'Pickup';
 
     if(!cart.length){ toast('Cart is empty.', 'error'); return; }
@@ -216,10 +283,10 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
     renderReceipt(pendingOrder);
 
     const isDelivery = orderType === 'Delivery';
-    document.getElementById('confirmDeliveryBtn').style.display = isDelivery ? '' : 'none';
-    document.getElementById('confirmPickupBtn').style.display = isDelivery ? 'none' : '';
+    const cDel = document.getElementById('confirmDeliveryBtn'); if(cDel) cDel.style.display = isDelivery ? '' : 'none';
+    const cPick = document.getElementById('confirmPickupBtn'); if(cPick) cPick.style.display = isDelivery ? 'none' : '';
 
-    document.getElementById('receiptOverlay').classList.add('open');
+    const receiptOverlay = document.getElementById('receiptOverlay'); if(receiptOverlay) receiptOverlay.classList.add('open');
 });
 
 function formatReceiptDate(){
@@ -249,8 +316,9 @@ function renderReceipt(order){
     `;
 }
 
-document.getElementById('receiptBackBtn').addEventListener('click', () => {
-    document.getElementById('receiptOverlay').classList.remove('open');
+const _receiptBackBtn = document.getElementById('receiptBackBtn');
+if(_receiptBackBtn) _receiptBackBtn.addEventListener('click', () => {
+    const receiptOverlay = document.getElementById('receiptOverlay'); if(receiptOverlay) receiptOverlay.classList.remove('open');
     pendingOrder = null;
 });
 
@@ -276,13 +344,10 @@ function buildPrintPayload(order){
 }
 
 /* ---------------- PRINT (thermal printer, w/ browser-print fallback) ---------------- */
-document.getElementById('printBtn').addEventListener('click', async () => {
-    if(!pendingOrder){
-        window.print();
-        return;
-    }
-
-    const btn = document.getElementById('printBtn');
+const _printBtn = document.getElementById('printBtn');
+if(_printBtn) _printBtn.addEventListener('click', async () => {
+    if(!pendingOrder){ window.print(); return; }
+    const btn = _printBtn;
     btn.disabled = true;
     try {
         const result = await printReceipt(buildPrintPayload(pendingOrder));
@@ -387,13 +452,10 @@ async function submitSale(triggerBtn){
     }
 }
 
-document.getElementById('confirmDeliveryBtn').addEventListener('click', function(){
-    submitSale(this);
-});
-
-document.getElementById('confirmPickupBtn').addEventListener('click', function(){
-    submitSale(this);
-});
+const _confirmDeliveryBtn = document.getElementById('confirmDeliveryBtn');
+if(_confirmDeliveryBtn) _confirmDeliveryBtn.addEventListener('click', function(){ submitSale(this); });
+const _confirmPickupBtn = document.getElementById('confirmPickupBtn');
+if(_confirmPickupBtn) _confirmPickupBtn.addEventListener('click', function(){ submitSale(this); });
 
 /* ---------------- PRINTER CONNECTION ---------------- */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -437,8 +499,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ---------------- INIT ---------------- */
-renderProducts();
-renderCart();
+document.addEventListener('DOMContentLoaded', () => {
+    buildCategoryTabs();
+    renderProducts();
+    renderCart();
+});
 
 document.getElementById('testPrintBtn')?.addEventListener('click', async () => {
     const result = await printReceipt(buildPrintPayload({

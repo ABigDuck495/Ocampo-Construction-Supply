@@ -14,6 +14,8 @@
         };
     </script>
 
+    @include('partials.system_settings_js')
+
     <!-- sidebar.css loads BEFORE the page-specific stylesheet, same as reports.blade,
         so inventory.css can safely override without fighting the shared .main rules -->
     @vite(['resources/css/sidebar.css', 'resources/css/inventory.css'])
@@ -77,7 +79,7 @@
             </div>
             <div class="header-stats">
                 <div class="hstat"><b id="statTotal">0</b><span>TOTAL PRODUCTS</span></div>
-                <div class="hstat value"><b id="statValue">$0.00</b><span>STOCK VALUE</span></div>
+                <div class="hstat value"><b id="statValue">₱0.00</b><span>STOCK VALUE</span></div>
                 <div class="hstat low"><b id="statLow">0</b><span>LOW STOCK</span></div>
                 <div class="hstat out"><b id="statOut">0</b><span>OUT OF STOCK</span></div>
             </div>
@@ -173,10 +175,14 @@
                         <label for="fldSubCategory">Sub-Category</label>
                         <input type="text" id="fldSubCategory" name="SubCategory" placeholder="e.g. Cement, Pipes, Nails" required>
                     </div>
-                    <div class="form-row-split">
+                        <div class="form-row-split">
                         <div class="form-row">
-                            <label for="fldPrice">Price ($)</label>
-                            <input type="number" id="fldPrice" name="Price" step="0.01" min="0" required>
+                            <label for="fldPrice">Price (₱)</label>
+                            <input type="number" id="fldPrice" name="Price" step="0.01" min="0">
+                        </div>
+                        <div class="form-row">
+                            <label for="fldVariablePricing">Variable price</label>
+                            <input type="checkbox" id="fldVariablePricing" name="Pricing_type" value="Variable">
                         </div>
                         <div class="form-row">
                             <label for="fldStock">Quantity On Hand</label>
@@ -197,8 +203,10 @@
         </div>
     </div>
 
-    <!-- ============================================================
+      <!-- ============================================================
         EDIT PRODUCT MODAL
+        (Quantity On Hand removed — inventory quantity is only
+        adjusted through transactions, never edited directly here)
         ============================================================ -->
     <div class="modal-overlay" id="editProductModal">
         <div class="modal-box">
@@ -234,15 +242,13 @@
                         <label for="editFldSubCategory">Sub-Category</label>
                         <input type="text" id="editFldSubCategory" name="SubCategory" required>
                     </div>
-                    <div class="form-row-split">
-                        <div class="form-row">
-                            <label for="editFldPrice">Price ($)</label>
-                            <input type="number" id="editFldPrice" name="Price" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-row">
-                            <label for="editFldStock">Quantity On Hand</label>
-                            <input type="number" id="editFldStock" name="QuantityOnHand" min="0" required>
-                        </div>
+                    <div class="form-row">
+                        <label for="editFldPrice">Price (₱)</label>
+                        <input type="text" id="editFldPrice" name="Price">
+                    </div>
+                    <div class="form-row">
+                        <label for="editFldVariablePricing">Variable price</label>
+                        <input type="checkbox" id="editFldVariablePricing" name="Pricing_type" value="Variable">
                     </div>
                     <div class="form-row">
                         <label for="editFldUnit">Unit</label>

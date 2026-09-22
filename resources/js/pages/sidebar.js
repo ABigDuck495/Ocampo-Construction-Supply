@@ -40,7 +40,7 @@ function initThemeToggle(){
 
     function applyTheme(light){
         document.body.classList.toggle('light-mode', light);
-        icon.innerHTML = light ? SUN_ICON : MOON_ICON;
-        label.textContent = light ? 'LIGHT MODE' : 'DARK MODE';
+        if (icon) icon.innerHTML = light ? SUN_ICON : MOON_ICON;
+        if (label) label.textContent = light ? 'LIGHT MODE' : 'DARK MODE';
     }
 }

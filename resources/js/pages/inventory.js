@@ -30,7 +30,7 @@ function mapInventoryToProducts(inventories) {
         unit: inv.product ? inv.product.Unit : '',
         category: inv.product ? inv.product.Category : 'Tools',
         subCategory: inv.product ? inv.product.SubCategory : '',
-        price: inv.product ? Number(inv.product.Price) : 0,
+        price: inv.product ? ((inv.product.Price === null || inv.product.Pricing_type === 'Variable') ? 'Variable' : Number(inv.product.Price)) : 0,
         stock: Number(inv.QuantityOnHand),
         reorderLevel: Number(inv.ReorderLevel),
     }));
@@ -43,7 +43,10 @@ const state = {
 };
 
 function fmtMoney(n) {
-    return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n === 'Variable') 
+        ? 'Variable' 
+        : 
+        '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function stockClass(stock) {
@@ -138,6 +141,24 @@ function bindEvents() {
         state.category = tab.dataset.cat;
         renderTable();
     });
+
+    // Build category tabs dynamically from the current inventory
+    (function buildCategoryTabs(){
+        const tabs = document.getElementById('catTabs');
+        if (!tabs) return;
+        const preferredOrder = Object.keys(CATEGORY_ICONS);
+        const categories = Array.from(new Set(state.products.map(p => p.category))).filter(Boolean);
+        // Sort by preferredOrder first, then alphabetically
+        categories.sort((a,b) => {
+            const ia = preferredOrder.indexOf(a);
+            const ib = preferredOrder.indexOf(b);
+            if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+            return a.localeCompare(b);
+        });
+
+        // Start with the ALL tab
+        tabs.innerHTML = `<div class="tab active" data-cat="all">ALL</div>` + categories.map(cat => `\n<div class="tab" data-cat="${escapeHtml(cat)}">${escapeHtml(cat.toUpperCase())}</div>`).join('');
+    })();
 
     document.getElementById('productBody').addEventListener('click', (e) => {
         const delBtn = e.target.closest('.btn-del');

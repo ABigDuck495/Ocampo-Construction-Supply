@@ -11,6 +11,7 @@
         products: @json($products),
     };
 </script>
+@include('partials.system_settings_js')
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
 <!-- <button id="testPrintBtn" style="position:fixed; bottom:20px; right:20px; z-index:9999; padding:10px 16px; background:#222; color:#fff; border:none; border-radius:6px; cursor:pointer;">
@@ -55,6 +56,12 @@
     </nav>
 
     <div class="sidebar-footer">
+        <a href="{{ route('settings.index') }}" class="nav-item {{ request()->routeIs('settings.*') ? 'active' : '' }}" style="display:block;margin-bottom:8px;">
+            <span class="lbl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg>
+                SETTINGS
+            </span>
+        </a>
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark mode">
             <span class="theme-toggle-icon" id="themeIcon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -84,18 +91,11 @@
         </div>
         <div class="header-stats">
             <div class="hstat"><b id="statCartItems">0</b><span>ITEMS</span></div>
-            <div class="hstat"><b id="statCartTotal">$0.00</b><span>TOTAL</span></div>
+            <div class="hstat"><b id="statCartTotal">₱0.00</b><span>TOTAL</span></div>
         </div>
     </div>
 
-    <div class="tabs" id="categoryTabs">
-        <div class="tab active" data-cat="all">ALL</div>
-        <div class="tab" data-cat="Tools">TOOLS</div>
-        <div class="tab" data-cat="Electrical">ELECTRICAL</div>
-        <div class="tab" data-cat="Plumbing">PLUMBING</div>
-        <div class="tab" data-cat="Paint">PAINT</div>
-        <div class="tab" data-cat="Hardware">HARDWARE</div>
-    </div>
+    <div class="tabs" id="categoryTabs"></div>
     <div class="hint">&middot; Click a product to add it to the cart &middot;</div>
 
     <div class="pos-board">
@@ -110,8 +110,8 @@
             <div class="cart-items" id="cartItems"></div>
 
             <div class="cart-summary">
-                <div class="cart-row"><span>Subtotal</span><span id="cartSubtotal">$0.00</span></div>
-                <div class="cart-row total"><span>Total</span><span id="cartTotal">$0.00</span></div>
+                <div class="cart-row"><span>Subtotal</span><span id="cartSubtotal">₱0.00</span></div>
+                <div class="cart-row total"><span>Total</span><span id="cartTotal">₱0.00</span></div>
             </div>
 
             <div class="order-type-toggle" id="orderTypeToggle">

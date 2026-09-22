@@ -82,19 +82,25 @@ class InventoryController extends Controller
             'Category'       => 'required|string|max:255',
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU',
-            'Price'          => 'required|numeric|min:0.01',
+            'Price'          => 'nullable|numeric|min:0',
+            'Pricing_type'   => ['nullable', 'string'],
             'QuantityOnHand' => 'required|integer|min:0',
             'ReorderLevel'   => 'nullable|integer|min:0',
         ]);
 
         return DB::transaction(function () use ($validated) {
+            $pricingType = $validated['Pricing_type'] ?? (isset($validated['Price']) ? 'Fixed' : 'Variable');
+            $pricingStatus = ($pricingType === 'Variable') ? 'Unresolved' : 'Resolved';
+
             $product = Product::create([
-                'Product_Name' => $validated['Product_Name'],
-                'Unit'         => $validated['Unit'],
-                'Category'     => $validated['Category'],
-                'SubCategory'  => $validated['SubCategory'],
-                'SKU'          => $validated['SKU'] ?? null,
-                'Price'        => $validated['Price'],
+                'Product_Name'   => $validated['Product_Name'],
+                'Unit'           => $validated['Unit'],
+                'Category'       => $validated['Category'],
+                'SubCategory'    => $validated['SubCategory'],
+                'SKU'            => $validated['SKU'] ?? null,
+                'Price'          => $validated['Price'] ?? null,
+                'Pricing_type'   => $pricingType,
+                'Pricing_status' => $pricingStatus,
             ]);
 
             $inventory = Inventory::create([
@@ -143,9 +149,13 @@ class InventoryController extends Controller
 
     /**
      * Update the Product's own fields (name/SKU/category/subcategory/price)
-     * AND its Inventory row (quantity/reorder level) together — the
+     * AND its Inventory row (reorder level only) together — the
      * counterpart to storeWithProduct(), used by the inventory page's
      * EDIT button/modal.
+     *
+     * QuantityOnHand is intentionally NOT accepted here — stock can only
+     * be changed via adjust() (Restock/Correction/Damage transactions),
+     * never through a direct product edit.
      */
     public function updateWithProduct(Request $request, Inventory $inventory)
     {
@@ -155,24 +165,28 @@ class InventoryController extends Controller
             'Category'       => 'required|string|max:255',
             'SubCategory'    => 'required|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU,' . $inventory->ProductID . ',ProductID',
-            'Price'          => 'required|numeric|min:0.01',
-            'QuantityOnHand' => 'required|integer|min:0',
+            'Price'          => 'nullable|numeric|min:0',
+            'Pricing_type'   => ['nullable', 'string'],
             'ReorderLevel'   => 'nullable|integer|min:0',
         ]);
 
         return DB::transaction(function () use ($validated, $inventory) {
+            $pricingType = $validated['Pricing_type'] ?? (isset($validated['Price']) ? 'Fixed' : $inventory->product->Pricing_type ?? 'Fixed');
+            $pricingStatus = ($pricingType === 'Variable') ? 'Unresolved' : 'Resolved';
+
             $inventory->product->update([
-                'Product_Name' => $validated['Product_Name'],
-                'Unit'         => $validated['Unit'],
-                'Category'     => $validated['Category'],
-                'SubCategory'  => $validated['SubCategory'],
-                'SKU'          => $validated['SKU'] ?? null,
-                'Price'        => $validated['Price'],
+                'Product_Name'   => $validated['Product_Name'],
+                'Unit'           => $validated['Unit'],
+                'Category'       => $validated['Category'],
+                'SubCategory'    => $validated['SubCategory'],
+                'SKU'            => $validated['SKU'] ?? null,
+                'Price'          => $validated['Price'] ?? null,
+                'Pricing_type'   => $pricingType,
+                'Pricing_status' => $pricingStatus,
             ]);
 
             $inventory->update([
-                'QuantityOnHand' => $validated['QuantityOnHand'],
-                'ReorderLevel'   => $validated['ReorderLevel'] ?? $inventory->ReorderLevel,
+                'ReorderLevel' => $validated['ReorderLevel'] ?? $inventory->ReorderLevel,
             ]);
 
             return $inventory->fresh()->load('product');

@@ -1,6 +1,10 @@
 /* ============================================================
    REPORTS - DATA + LOGIC
    Filtered by Month/Year + Report Type (orders | items) selectors.
+   Header stat bar (top orange strip) has its OWN month/year picker,
+   independent of the Sales Summary filter below it, so you can glance
+   at any past month's totals without clicking Generate Report or
+   exporting a file. Defaults to the current month on page load.
    ============================================================ */
 
 let salesStats = { totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, topCategory: '—' };
@@ -11,12 +15,8 @@ let deliveryHistory = [];
 
 function fmt(n){ return '$' + Number(n || 0).toFixed(2); }
 
-/* ---------------- RENDER: SALES SUMMARY ---------------- */
+/* ---------------- RENDER: SALES SUMMARY (filtered stat cards) ---------------- */
 function renderSalesStats(){
-    document.getElementById('statTotalRevenue').textContent = fmt(salesStats.totalRevenue);
-    document.getElementById('statTotalOrders').textContent = salesStats.totalOrders;
-    document.getElementById('statAvgOrder').textContent = fmt(salesStats.avgOrderValue);
-
     document.getElementById('cardRevenue').textContent = fmt(salesStats.totalRevenue);
     document.getElementById('cardOrders').textContent = salesStats.totalOrders;
     document.getElementById('cardAvg').textContent = fmt(salesStats.avgOrderValue);
@@ -72,7 +72,7 @@ function renderItemsOrdered(){
     }
     body.innerHTML = itemsOrdered.map(i => `
         <tr>
-            <td>${i.productName}</td>
+            <td>${i.name}</td>
             <td class="cell-dim">${i.category}</td>
             <td class="cell-dim">${i.unitsSold}</td>
             <td class="cell-total">${fmt(i.revenue)}</td>
@@ -103,7 +103,7 @@ function renderDeliveryHistory(){
         </tr>`).join('');
 }
 
-/* ---------------- FILTER STATE HELPERS ---------------- */
+/* ---------------- FILTER STATE HELPERS (Sales Summary section) ---------------- */
 function currentReportType(){
     const el = document.getElementById('filterReportType');
     return el ? el.value : 'orders';
@@ -117,16 +117,26 @@ function currentFilterParams(){
     });
 }
 
-function populateYearOptions(){
-    const yearSelect = document.getElementById('filterYear');
+function populateYearOptions(selectEl){
     const currentYear = new Date().getFullYear();
     const startYear = currentYear - 5;
     for (let y = currentYear; y >= startYear; y--) {
         const opt = document.createElement('option');
         opt.value = y;
         opt.textContent = y;
-        yearSelect.appendChild(opt);
+        selectEl.appendChild(opt);
     }
+}
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function populateMonthOptions(selectEl){
+    MONTH_NAMES.forEach((name, i) => {
+        const opt = document.createElement('option');
+        opt.value = i + 1;
+        opt.textContent = name;
+        selectEl.appendChild(opt);
+    });
 }
 
 /* ---------------- PANEL TOGGLE (Customer Orders vs Items Ordered) ---------------- */
@@ -145,7 +155,7 @@ function toggleReportTypePanels(){
     }
 }
 
-/* ---------------- FETCH FROM BACKEND ---------------- */
+/* ---------------- FETCH: FILTERED REPORT DATA (Sales Summary section) ---------------- */
 async function fetchReportsData(){
     try {
         const res = await fetch(`/reports/data?${currentFilterParams()}`);
@@ -169,7 +179,29 @@ async function fetchReportsData(){
     }
 }
 
-/* ---------------- EXPORTS ---------------- */
+/* ---------------- FETCH: HEADER SUMMARY (own month/year picker) ---------------- */
+function currentHeaderParams(){
+    return new URLSearchParams({
+        month: document.getElementById('headerMonth').value,
+        year: document.getElementById('headerYear').value,
+    });
+}
+
+async function fetchHeaderSummary(){
+    try {
+        const res = await fetch(`/reports/summary?${currentHeaderParams()}`);
+        if(!res.ok) throw new Error('Failed to load summary');
+        const data = await res.json();
+
+        document.getElementById('statTotalRevenue').textContent = fmt(data.totalRevenue);
+        document.getElementById('statTotalOrders').textContent = data.totalOrders;
+        document.getElementById('statAvgOrder').textContent = fmt(data.avgOrderValue);
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+/* ---------------- EXPORTS (Sales Summary section) ---------------- */
 function buildExportUrl(base){
     return `${base}?${currentFilterParams()}`;
 }
@@ -190,6 +222,27 @@ if(filterReportTypeEl){
     });
 }
 
+/* Header picker: changing month or year re-fetches the summary immediately,
+   AND syncs the Sales Summary filter below to the same month/year, so the
+   stat cards, top products, and recent sales table all reflect the same
+   period — one picker driving the whole dashboard, no button needed. */
+const headerMonthEl = document.getElementById('headerMonth');
+const headerYearEl = document.getElementById('headerYear');
+if(headerMonthEl && headerYearEl){
+    headerMonthEl.addEventListener('change', () => {
+        document.getElementById('filterMonth').value = headerMonthEl.value;
+        document.getElementById('filterYear').value = headerYearEl.value;
+        fetchHeaderSummary();
+        fetchReportsData();
+    });
+    headerYearEl.addEventListener('change', () => {
+        document.getElementById('filterMonth').value = headerMonthEl.value;
+        document.getElementById('filterYear').value = headerYearEl.value;
+        fetchHeaderSummary();
+        fetchReportsData();
+    });
+}
+
 /* ---------------- TABS ---------------- */
 document.getElementById('reportTabs').addEventListener('click', e => {
     const tab = e.target.closest('.tab');
@@ -201,13 +254,31 @@ document.getElementById('reportTabs').addEventListener('click', e => {
 
     document.querySelectorAll('.report-view').forEach(v => v.classList.remove('active'));
     document.getElementById(`view-${target}`).classList.add('active');
+
+    // Revenue/Orders/Avg Order stats + month picker only make sense for
+    // Sales Summary — hide them on Delivery History.
+    const headerStatsEl = document.getElementById('headerStats');
+    if(headerStatsEl){
+        headerStatsEl.style.display = (target === 'delivery') ? 'none' : '';
+    }
 });
 
 /* ---------------- INIT ---------------- */
-populateYearOptions();
 const today = new Date();
+
+// Sales Summary filter (unchanged behavior)
+populateYearOptions(document.getElementById('filterYear'));
 document.getElementById('filterMonth').value = today.getMonth() + 1;
 document.getElementById('filterYear').value = today.getFullYear();
 
+// Header picker (new) — defaults to current month/year on load
+if(headerMonthEl && headerYearEl){
+    populateMonthOptions(headerMonthEl);
+    populateYearOptions(headerYearEl);
+    headerMonthEl.value = today.getMonth() + 1;
+    headerYearEl.value = today.getFullYear();
+}
+
 toggleReportTypePanels();
 fetchReportsData();
+fetchHeaderSummary();

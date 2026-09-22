@@ -304,4 +304,34 @@ class ReportController extends Controller
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
     }
+
+    // ReportController.php
+
+    /**
+     * Header stat bar (top orange strip). Scoped to the CURRENT calendar
+     * month only — it naturally "resets" on the 1st of each month since
+     * it always queries against now()->month / now()->year rather than
+     * summing the whole Report table.
+     */
+     public function summary(Request $request)
+    {
+        $month = (int) ($request->month ?? now()->month);
+        $year  = (int) ($request->year ?? now()->year);
+ 
+        $reports = Report::whereMonth('ReportDate', $month)
+            ->whereYear('ReportDate', $year)
+            ->get();
+ 
+        $totalRevenue = $reports->sum('TotalSales');
+        $totalOrders  = $reports->sum('TotalOrders');
+        $avgOrder     = $totalOrders ? $totalRevenue / $totalOrders : 0;
+ 
+        return response()->json([
+            'totalRevenue'  => $totalRevenue,
+            'totalOrders'   => $totalOrders,
+            'avgOrderValue' => $avgOrder,
+            'month'         => Carbon::create($year, $month, 1)->format('F Y'),
+        ]);
+    }
 }
+

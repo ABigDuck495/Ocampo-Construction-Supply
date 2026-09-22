@@ -13,6 +13,8 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
    ------------------------------------------------------------------- */
 const rawOrderItems = (window.DISPATCH_DATA && window.DISPATCH_DATA.orders) || [];
 const rawTrucks = (window.DISPATCH_DATA && window.DISPATCH_DATA.trucks) || [];
+const SYS = (window.SYSTEM_SETTINGS) ? window.SYSTEM_SETTINGS : {};
+const TRUCK_CAPACITY_TRACKING = SYS.enable_truck_capacity_tracking === 'true';
 
 function groupOrderItems(items) {
     const map = {};
@@ -92,7 +94,7 @@ const svg = {
     note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>',
 };
 
-function fmt(n){ return '$' + Number(n || 0).toFixed(2); }
+function fmt(n){ return '₱' + Number(n || 0).toFixed(2); }
 function cargoOf(order){ return order.items.reduce((s,i)=>s + (parseFloat(i.qty) || 0), 0); }
 function truckCargo(truck){
     return orders.filter(o=>o.truck===truck.id).reduce((s,o)=>s+cargoOf(o),0);
@@ -330,7 +332,7 @@ function openAssignModal(orderId, truckId){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
     if(!order || !truck) return;
 
-    const remainingCapacity = truck.capacity - truckCargo(truck);
+    const remainingCapacity = TRUCK_CAPACITY_TRACKING ? truck.capacity - truckCargo(truck) : Number.POSITIVE_INFINITY;
 
     const rows = order.items.map((item, idx) => `
         <div class="doa-item-row">
@@ -362,7 +364,11 @@ function openAssignModal(orderId, truckId){
     function currentCargo(){
         return Array.from(overlay.querySelectorAll('.doa-qty-input')).reduce((s, inp) => s + (parseFloat(inp.value) || 0), 0);
     }
-    function updateCapNote(){
+        function updateCapNote(){
+        if (!TRUCK_CAPACITY_TRACKING) {
+            overlay.querySelector('#doaCapNote').textContent = '';
+            return;
+        }
         const cargo = currentCargo();
         const note = overlay.querySelector('#doaCapNote');
         note.textContent = `${cargo}/${remainingCapacity} of remaining truck capacity`;
@@ -381,7 +387,7 @@ function openAssignModal(orderId, truckId){
         }));
         const cargo = chosen.reduce((s, c) => s + c.qty, 0);
         if(cargo <= 0){ alert('Pick at least one item to send.'); return; }
-        if(cargo > remainingCapacity){ alert(`${truck.name} doesn't have enough capacity left for this selection.`); return; }
+        if (TRUCK_CAPACITY_TRACKING && cargo > remainingCapacity){ alert(`${truck.name} doesn't have enough capacity left for this selection.`); return; }
         close();
         applyPasabaySplit(order, truck, chosen);
     });

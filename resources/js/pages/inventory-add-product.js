@@ -83,6 +83,7 @@
         const qty = Number(inventory.QuantityOnHand);
         const reorderLevel = Number(inventory.ReorderLevel);
         const price = Number(product.Price);
+        const isVariable = product.Pricing_type === 'Variable' || product.Price === null || product.Price === undefined;
 
         const tr = document.createElement('tr');
         tr.dataset.inventoryId = inventory.InventoryID ?? '';
@@ -93,7 +94,7 @@
             <td class="sku-cell">${escapeHtml(product.SKU)}</td>
             <td><span class="cat-pill">${escapeHtml(product.Category)}</span></td>
             <td class="unit-cell">${escapeHtml(product.Unit || '')}</td>
-            <td class="price-cell">$${price.toFixed(2)}</td>
+            <td class="price-cell">${isVariable ? '<span class="var-price">Variable</span>' : '₱' + price.toFixed(2)}</td>
             <td><span class="${stockPillClass(qty, reorderLevel)}">${qty}</span></td>
             <td class="actions-cell">
                 <button type="button" class="btn-edit"
@@ -104,7 +105,8 @@
                     data-unit="${escapeHtml(product.Unit || '')}"
                     data-category="${escapeHtml(product.Category)}"
                     data-subcategory="${escapeHtml(product.SubCategory)}"
-                    data-price="${product.Price}"
+                    data-price="${product.Price ?? ''}"
+                    data-pricing-type="${product.Pricing_type ?? 'Fixed'}"
                     data-stock="${inventory.QuantityOnHand}"
                     data-reorder-level="${inventory.ReorderLevel}"
                 >EDIT</button>
@@ -128,7 +130,9 @@
 
         if (statValue) {
             const current = parseFloat(statValue.textContent.replace(/[^0-9.]/g, '')) || 0;
-            statValue.textContent = '$' + (current + price * qty).toFixed(2);
+            if (!isNaN(price) && price > 0) {
+                statValue.textContent = '₱' + (current + price * qty).toFixed(2);
+            }
         }
 
         if (qty <= 0 && statOut) {
@@ -149,7 +153,8 @@
             Unit: document.getElementById('fldUnit').value.trim(),
             Category: document.getElementById('fldCategory').value,
             SubCategory: document.getElementById('fldSubCategory').value.trim(),
-            Price: document.getElementById('fldPrice').value,
+            Price: document.getElementById('fldPrice').value || null,
+            Pricing_type: document.getElementById('fldVariablePricing').checked ? 'Variable' : 'Fixed',
             QuantityOnHand: document.getElementById('fldStock').value,
             ReorderLevel: document.getElementById('fldReorderLevel').value || undefined,
         };

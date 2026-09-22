@@ -35,9 +35,23 @@ class OrderItemController extends Controller
         $validated = $request->validate([
             'OrderID' => 'required|exists:orders,OrderID',
             'ProductID' => 'required|exists:products,ProductID',
-            'Quantity' => 'required|integer|min:1',
+            'Quantity' => 'required|numeric|min:0.01',
+            'UnitPrice' => 'nullable|numeric|min:0',
+            'Pricing_method' => ['nullable', 'string', Rule::in(['Fixed','Variable'])],
+            'Pricing_status' => ['nullable', 'string', Rule::in(['Resolved','Unresolved'])],
             'Status' => ['nullable', 'string', Rule::in(array_merge(OrderItem::allowedStatuses(), ['Partially Fulfilled', 'Fulfilled']))],
         ]);
+
+        // If attempting to mark as Resolved, ensure a UnitPrice exists or product has a price
+        if (! empty($validated['Pricing_status']) && $validated['Pricing_status'] === 'Resolved') {
+            $hasPrice = isset($validated['UnitPrice']) && is_numeric($validated['UnitPrice']);
+            if (! $hasPrice) {
+                $product = \App\Models\Product::find($validated['ProductID']);
+                if (! ($product && $product->UnitPrice !== null)) {
+                    return response()->json(['message' => 'Cannot mark pricing as Resolved without a unit price.'], 422);
+                }
+            }
+        }
 
         return OrderItem::create($validated);
     }
@@ -66,11 +80,22 @@ class OrderItemController extends Controller
         $validated = $request->validate([
             'OrderID' => 'sometimes|required|exists:orders,OrderID',
             'ProductID' => 'sometimes|required|exists:products,ProductID',
-            'Quantity' => 'sometimes|required|integer|min:1',
+            'Quantity' => 'sometimes|required|numeric|min:0.01',
+            'UnitPrice' => 'nullable|numeric|min:0',
+            'Pricing_method' => ['nullable', 'string', Rule::in(['Fixed','Variable'])],
+            'Pricing_status' => ['nullable', 'string', Rule::in(['Resolved','Unresolved'])],
             'Status' => ['sometimes', 'required', 'string', Rule::in(array_merge(OrderItem::allowedStatuses(), ['Partially Fulfilled', 'Fulfilled']))],
         ]);
 
         $orderItem = OrderItem::findOrFail($id);
+        // Prevent marking as Resolved without a price
+        if (array_key_exists('Pricing_status', $validated) && $validated['Pricing_status'] === 'Resolved') {
+            $hasPrice = array_key_exists('UnitPrice', $validated) && is_numeric($validated['UnitPrice']);
+            if (! $hasPrice && ($orderItem->UnitPrice === null && ($orderItem->product?->UnitPrice === null))) {
+                return response()->json(['message' => 'Cannot mark pricing as Resolved without a unit price.'], 422);
+            }
+        }
+
         $orderItem->fill($validated);
         $orderItem->save();
 

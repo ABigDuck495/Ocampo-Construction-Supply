@@ -15,7 +15,11 @@ return new class extends Migration
             $table->id('OrderItemID');
             $table->unsignedBigInteger('OrderID');
             $table->unsignedBigInteger('ProductID');
-            $table->string('Quantity', 255)->default(1);
+            $table->decimal('Quantity', 10, 2)->nullable();
+            // Per-line unit price when explicitly provided (nullable for variable pricing)
+            $table->decimal('UnitPrice', 12, 2)->nullable();
+            $table->enum('Pricing_method', ['Fixed', 'Variable'])->default('Fixed');
+            $table->enum('Pricing_status', ['Resolved', 'Unresolved'])->default('Unresolved');
             $table->enum('Status', ['Pending', 'In Progress', 'Completed'])->default('Pending');
             $table->timestamps();
             $table->foreign('OrderID')->references('OrderID')->on('orders')->onDelete('cascade');
