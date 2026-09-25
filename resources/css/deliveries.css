@@ -188,8 +188,14 @@ body{
     border:2px solid var(--border);
     padding:14px;
     display:flex;flex-direction:column;gap:10px;
-    transition:border-color .15s ease;
+    transition:border-color .15s ease, opacity .15s ease, background .15s ease;
 }
+.truck-card.is-full{
+    border-color:var(--blue);
+    background:rgba(77, 158, 255, 0.06);
+    opacity:0.96;
+}
+.truck-card.is-full .cargo-label b{color:var(--blue);}
 .truck-card.drop-active{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange-glow);}
 .tc-top{display:flex;align-items:center;justify-content:space-between;}
 .tc-name{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;}

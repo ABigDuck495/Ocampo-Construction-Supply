@@ -13,20 +13,34 @@ class Driver extends Model
         'PhoneNumber',
     ];
     protected $guarded = ['DriverID'];
-    
-    public function dispatches() {
+
+    public function dispatches()
+    {
         return $this->belongsToMany(Dispatch::class, 'dispatch_drivers', 'DriverID', 'DispatchID')
-                    ->withPivot('Role');
-    }
-    public function dispatchDrivers(){
-        return $this->hasMany(DispatchDriver::class, 'DriverID', 'DriverID');
-    }
-    public function activeDispatches(){
-        return $this->dispacthes()->wherePivot('Role', 'Main')
-                    ->where('Status', 'On Route');
-    }
-    public function getDeliveriesCountAttribute(){
-        return $this->deliveries()->count();
+            ->withPivot('Role');
     }
 
+    public function dispatchDrivers()
+    {
+        return $this->hasMany(DispatchDriver::class, 'DriverID', 'DriverID');
+    }
+
+    public function activeDispatches()
+    {
+        return $this->dispatches()
+            ->wherePivot('Role', 'Driver')
+            ->where('Status', 'On Route');
+    }
+
+    public function scopeAvailable($query)
+    {
+        return $query->whereDoesntHave('dispatchDrivers.dispatch', function ($dispatchQuery) {
+            $dispatchQuery->whereIn('Status', ['On Route']);
+        })->orderBy('Name');
+    }
+
+    public function getDeliveriesCountAttribute()
+    {
+        return $this->deliveries()->count();
+    }
 }

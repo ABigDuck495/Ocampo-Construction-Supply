@@ -55,8 +55,8 @@ function groupOrderItems(items) {
 function mapTrucks(list) {
     return list.map(t => {
         const activeDispatches = (t.dispatches || []).filter(d => d.Status === 'On Route');
-        const mainDriver = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Main');
-        const boardmate = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Assistant');
+        const mainDriver = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Driver');
+        const boardmate = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Helper');
 
         let status = 'idle';
         if (t.Status === 'On Route') status = 'transit';
@@ -81,6 +81,7 @@ let trucks = mapTrucks(rawTrucks);
 let activeTab = 'all';
 let dragOrderId = null;
 let pasabaySplitCounter = 1; // used to build unique ids for "sent" cards carved off a pasabay order
+const pendingDispatchDriversByTruck = new Map();
 
 const svg = {
     pin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-7.2-7-12a7 7 0 0 1 14 0c0 4.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
@@ -230,14 +231,16 @@ function renderTrucks(){
         } else if(truck.status==='transit'){
             actionsHtml = `
                 <div class="tc-actions">
-                    <button class="btn btn-delivered" onclick="markDelivered('${truck.id}')">${svg.check} MARK DELIVERED</button>
-                    <button class="btn btn-return" onclick="markReturned('${truck.id}')" title="No one claimed it">${svg.back}</button>
+                    <button class="btn btn-delivered" onclick="markDelivered('${truck.id}')">${svg.check} SUCCESSFUL</button>
+                    <button class="btn btn-return" onclick="markReturned('${truck.id}')" title="Dispatch failed">${svg.back} FAILED</button>
                 </div>
                 <div class="tc-departed">DEPARTED: ${truck.departed || ''}</div>`;
         }
 
+        const isLocked = truck.status === 'transit';
+
         return `
-        <div class="truck-card" data-truck="${truck.id}">
+        <div class="truck-card ${isLocked ? 'is-full' : ''}" data-truck="${truck.id}">
             <div class="tc-top">
                 <div>
                     <div class="tc-name">${svg.truck} ${truck.name} ${statusBadgeClass ? `<span class="badge ${statusBadgeClass}">${statusLabel}</span>` : `<span class="badge" style="color:var(--text-dim)">${statusLabel}</span>`}</div>
@@ -258,6 +261,7 @@ function renderTrucks(){
     grid.querySelectorAll('.truck-card').forEach(card=>{
         const truckId = card.dataset.truck;
         const truck = trucks.find(t=>String(t.id)===String(truckId));
+        if(truck.status === 'transit') return;
         if(truck.status !== 'loading' && truck.status !== 'idle') return;
 
         card.addEventListener('dragover', e=>{
@@ -268,7 +272,7 @@ function renderTrucks(){
         card.addEventListener('drop', e=>{
             e.preventDefault();
             card.classList.remove('drop-active');
-            if(dragOrderId) openAssignModal(dragOrderId, truckId);
+            if(dragOrderId && truck.status !== 'transit') openAssignModal(dragOrderId, truckId);
             dragOrderId = null;
         });
     });
@@ -327,12 +331,13 @@ function injectAssignModalStyles(){
 // Opens a per-item quantity picker before an order actually lands on a truck.
 // Whatever isn't sent now stays on the original card as still-pending stock,
 // ready to go out on the next delivery run.
-function openAssignModal(orderId, truckId){
+async function openAssignModal(orderId, truckId){
     const order = orders.find(o=>o.id===orderId);
     const truck = trucks.find(t=>String(t.id)===String(truckId));
     if(!order || !truck) return;
 
     const remainingCapacity = TRUCK_CAPACITY_TRACKING ? truck.capacity - truckCargo(truck) : Number.POSITIVE_INFINITY;
+    const drivers = await fetchAvailableDrivers();
 
     const rows = order.items.map((item, idx) => `
         <div class="doa-item-row">
@@ -341,6 +346,24 @@ function openAssignModal(orderId, truckId){
             <input type="number" class="doa-qty-input" data-idx="${idx}" min="0" max="${item.qty}" value="${item.qty}" step="1">
         </div>
     `).join('');
+
+    const driverOptions = drivers.length
+        ? drivers.map(d => `<option value="${d.DriverID}">${d.Name}</option>`).join('')
+        : '<option value="">No drivers available</option>';
+
+    const mainDriverSelect = (selectedId = '') => `
+        <option value="">Select driver</option>
+        ${drivers.map(d => `<option value="${d.DriverID}" ${String(d.DriverID) === String(selectedId) ? 'selected' : ''}>${d.Name}</option>`).join('')}
+    `;
+
+    const buildHelperOptions = (selectedMainId = '', selectedHelperId = '') => {
+        const options = drivers
+            .filter(d => String(d.DriverID) !== String(selectedMainId))
+            .map(d => `<option value="${d.DriverID}" ${String(d.DriverID) === String(selectedHelperId) ? 'selected' : ''}>${d.Name}</option>`)
+            .join('');
+
+        return `<option value="">— none —</option>${options}`;
+    };
 
     const overlay = document.createElement('div');
     overlay.className = 'doa-modal-overlay';
@@ -353,6 +376,17 @@ function openAssignModal(orderId, truckId){
             <div class="doa-modal-sub">Pick how many of each item to send now (pasabay). Anything left over stays pending for the next delivery run.</div>
             <div class="doa-item-list">${rows}</div>
             <div class="doa-modal-note" id="doaCapNote"></div>
+
+            <label class="doa-field-label">MAIN DRIVER</label>
+            <select class="doa-select" id="doaMainDriver" ${drivers.length ? '' : 'disabled'}>
+                ${mainDriverSelect()}
+            </select>
+
+            <label class="doa-field-label">HELPER <span class="doa-optional">(optional)</span></label>
+            <select class="doa-select" id="doaHelperDriver">
+                ${buildHelperOptions()}
+            </select>
+
             <div class="doa-modal-actions">
                 <button class="btn-ghost" id="doaCancelBtn">CANCEL</button>
                 <button class="btn btn-dispatch" id="doaConfirmBtn">CONFIRM</button>
@@ -361,10 +395,19 @@ function openAssignModal(orderId, truckId){
     document.body.appendChild(overlay);
     injectAssignModalStyles();
 
+    const mainDriverSelectEl = overlay.querySelector('#doaMainDriver');
+    const helperDriverSelectEl = overlay.querySelector('#doaHelperDriver');
+
+    mainDriverSelectEl.addEventListener('change', () => {
+        const selectedMainId = mainDriverSelectEl.value;
+        const currentlySelectedHelper = helperDriverSelectEl.value;
+        helperDriverSelectEl.innerHTML = buildHelperOptions(selectedMainId, currentlySelectedHelper === selectedMainId ? '' : currentlySelectedHelper);
+    });
+
     function currentCargo(){
         return Array.from(overlay.querySelectorAll('.doa-qty-input')).reduce((s, inp) => s + (parseFloat(inp.value) || 0), 0);
     }
-        function updateCapNote(){
+    function updateCapNote(){
         if (!TRUCK_CAPACITY_TRACKING) {
             overlay.querySelector('#doaCapNote').textContent = '';
             return;
@@ -386,8 +429,19 @@ function openAssignModal(orderId, truckId){
             qty: Math.max(0, Math.min(parseFloat(inp.value) || 0, order.items[Number(inp.dataset.idx)].qty)),
         }));
         const cargo = chosen.reduce((s, c) => s + c.qty, 0);
+        const mainDriverId = overlay.querySelector('#doaMainDriver')?.value || '';
+        const helperDriverId = overlay.querySelector('#doaHelperDriver')?.value || '';
+
         if(cargo <= 0){ alert('Pick at least one item to send.'); return; }
         if (TRUCK_CAPACITY_TRACKING && cargo > remainingCapacity){ alert(`${truck.name} doesn't have enough capacity left for this selection.`); return; }
+        if (!mainDriverId) { alert('Please select a main driver before dispatching.'); return; }
+
+        const selection = {
+            driverId: mainDriverId,
+            boardmateId: helperDriverId || null,
+        };
+
+        pendingDispatchDriversByTruck.set(String(truckId), selection);
         close();
         applyPasabaySplit(order, truck, chosen);
     });
@@ -556,16 +610,16 @@ function openDriverPickerModal(){
 
 // Real dispatch - creates one Dispatch record per OrderItem assigned to this truck,
 // after the dispatcher confirms a driver (and optional boardmate) in the picker.
-async function dispatchTruck(truckId){
+async function dispatchTruck(truckId, presetDrivers = null){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
     const assigned = orders.filter(o=>String(o.truck)===String(truckId));
     if(!assigned.length) return;
 
-    const picked = await openDriverPickerModal();
-    if(!picked) return;
+    const selectedDrivers = presetDrivers || pendingDispatchDriversByTruck.get(String(truckId)) || await openDriverPickerModal();
+    if(!selectedDrivers) return;
 
-    const dispatchDrivers = [{ DriverID: picked.driverId, Role: 'Main' }];
-    if(picked.boardmateId) dispatchDrivers.push({ DriverID: picked.boardmateId, Role: 'Assistant' });
+    const dispatchDrivers = [{ DriverID: selectedDrivers.driverId, Role: 'Driver' }];
+    if(selectedDrivers.boardmateId) dispatchDrivers.push({ DriverID: selectedDrivers.boardmateId, Role: 'Helper' });
 
     const dispatchDate = new Date().toISOString().split('T')[0];
 
@@ -650,7 +704,7 @@ async function markReturned(truckId){
                 },
                 body: JSON.stringify({
                     QuantityDelivered: 0,
-                    Status: 'Returned',
+                    Status: 'Failed',
                 }),
             });
             if(!res.ok){

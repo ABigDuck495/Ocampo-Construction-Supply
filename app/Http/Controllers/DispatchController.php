@@ -42,7 +42,7 @@ class DispatchController extends Controller
             'DispatchDate' => 'required|date',
             'drivers' => 'required|array|min:1',
             'drivers.*.DriverID' => 'required|exists:drivers,DriverID',
-            'drivers.*.Role' => 'required|in:Main,Assistant',
+            'drivers.*.Role' => 'required|in:Driver,Helper',
         ]);
 
         return DB::transaction(function () use ($validated) {

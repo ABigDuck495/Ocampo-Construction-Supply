@@ -80,11 +80,15 @@ class DriverController extends Controller
 
         return response()->json(['message' => 'Driver deleted successfully.'], 200);
     }
-    public function available(){
-        $busyDriverIds = DispatchDriver::whereHas('dispatch', fn($q) => $q->where('Status', 'On Route'))
-            ->pluck('DriverID');
+    public function available()
+    {
+        $available = Driver::available()->get();
 
-        return Driver::whereNotIn('DriverID', $busyDriverIds)->get();
+        if ($available->isNotEmpty()) {
+            return $available;
+        }
+
+        return Driver::query()->orderBy('Name')->get();
     }
 
     // Driver trip count / performance summary over a date range
@@ -96,8 +100,8 @@ class DriverController extends Controller
 
         return [
             'total_trips' => $dispatches->count(),
-            'as_main' => $dispatches->wherePivot('Role', 'Main')->count(),
-            'as_assistant' => $dispatches->wherePivot('Role', 'Assistant')->count(),
+            'as_main' => $dispatches->wherePivot('Role', 'Driver')->count(),
+            'as_assistant' => $dispatches->wherePivot('Role', 'Helper')->count(),
         ];
     }
 }

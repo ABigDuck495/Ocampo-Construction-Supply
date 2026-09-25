@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\OrderController;
 use App\Models\Delivery;
 use App\Models\Dispatch;
+use App\Models\Driver;
 use App\Models\OrderItem;
 use App\Models\Truck;
 use Illuminate\Http\Request;
@@ -25,12 +26,13 @@ class DeliveryController extends Controller
         ->get();
 
     $trucks = Truck::with(['dispatches.drivers'])->get();
+    $drivers = Driver::all();
 
     $systemSettings = \Illuminate\Support\Facades\DB::table('system_settings')
             ->pluck('Setting_Value', 'Setting_Key')
             ->toArray();
 
-    return view('deliveries.index', compact('orders', 'trucks', 'systemSettings'));
+    return view('deliveries.index', compact('orders', 'trucks', 'systemSettings', 'drivers'));
 }
 
     /**
@@ -48,7 +50,7 @@ class DeliveryController extends Controller
     {
         $validated = $request->validate([
             'QuantityDelivered' => 'required|integer|min:0',
-            'Status' => 'required|in:Delivered,Failed,Returned',
+            'Status' => 'required|in:Delivered,Failed',
             'Notes' => 'nullable|string',
         ]);
 
@@ -61,21 +63,26 @@ class DeliveryController extends Controller
                 'Notes' => $validated['Notes'] ?? null,
             ]);
 
+            if ($validated['Status'] === 'Failed') {
+                $dispatch->update(['Status' => 'Pending']);
+                $dispatch->truck()->update(['Status' => 'Available']);
+
+                return $delivery->load('dispatch');
+            }
+
             $dispatch->truck()->update(['Status' => 'Available']);
             $dispatch->update(['Status' => 'Delivered']);
-            if ($validated['Status'] === 'Delivered') {
-                $product = $dispatch->orderItem->product;
-                $product->inventory?->deduct($validated['QuantityDelivered']);
+            $product = $dispatch->orderItem->product;
+            $product->inventory?->deduct($validated['QuantityDelivered']);
 
-                $orderItem = $dispatch->orderItem;
-                if ($orderItem->quantityDispatched() >= $orderItem->Quantity) {
-                    $orderItem->update(['Status' => OrderItem::STATUS_COMPLETED]);
-                } else {
-                    $orderItem->update(['Status' => OrderItem::STATUS_IN_PROGRESS]);
-                }
-
-                app(OrderController::class)->syncStatus($orderItem->order);
+            $orderItem = $dispatch->orderItem;
+            if ($orderItem->quantityDispatched() >= $orderItem->Quantity) {
+                $orderItem->update(['Status' => OrderItem::STATUS_COMPLETED]);
+            } else {
+                $orderItem->update(['Status' => OrderItem::STATUS_IN_PROGRESS]);
             }
+
+            app(OrderController::class)->syncStatus($orderItem->order);
 
             return $delivery->load('dispatch');
         });

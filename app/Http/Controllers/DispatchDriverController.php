@@ -36,7 +36,7 @@ class DispatchDriverController extends Controller
         $validated = $request->validate([
             'DispatchID' => 'required|exists:dispatches,DispatchID',
             'DriverID' => 'required|exists:drivers,DriverID',
-            'Role' => 'required|in:Main,Assistant',
+            'Role' => 'required|in:Driver,Helper',
         ]);
 
         $assignment = DispatchDriver::create($validated);
@@ -68,7 +68,7 @@ class DispatchDriverController extends Controller
         $validated = $request->validate([
             'DispatchID' => 'sometimes|required|exists:dispatches,DispatchID',
             'DriverID' => 'sometimes|required|exists:drivers,DriverID',
-            'Role' => 'sometimes|required|in:Main,Assistant',
+            'Role' => 'sometimes|required|in:Driver,Helper',
         ]);
 
         $assignment = DispatchDriver::findOrFail($id);
@@ -91,10 +91,10 @@ class DispatchDriverController extends Controller
     public function assign(Request $request, Dispatch $dispatch){
         $validated = $request->validate([
             'DriverID' => 'required|exists:drivers,DriverID',
-            'Role' => 'required|in:Main,Assistant',
+            'Role' => 'required|in:Driver,Helper',
         ]);
 
-        if ($validated['Role'] === 'Main' && $dispatch->mainDriver()->exists()) {
+        if ($validated['Role'] === 'Driver' && $dispatch->mainDriver()->exists()) {
             abort(422, 'This dispatch already has a main driver.');
         }
 
