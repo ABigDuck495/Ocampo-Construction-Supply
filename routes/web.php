@@ -46,6 +46,10 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:Admin,Staff'])->group(function () {
         Route::post('dispatches/{dispatch}/deliveries', [DeliveryController::class, 'store'])->name('deliveries.storeForDispatch');
         Route::get('dispatches/unassigned', [DispatchController::class, 'unassignedItems'])->name('dispatches.unassigned');
+        Route::get('drivers/available', [DriverController::class, 'available']);
+        Route::get('drivers/{driver}/summary', [DriverController::class, 'summary']);
+        Route::get('trucks/available', [TruckController::class, 'available']);
+        Route::get('trucks/{truck}/utilization', [TruckController::class, 'utilization']);
         Route::resource('products', ProductController::class);
         Route::resource('inventories', InventoryController::class);
         Route::resource('orders', OrderController::class);
@@ -73,10 +77,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('order-items/{orderItem}/update-status', [OrderItemController::class, 'updateStatus']);
         Route::get('dispatches/active', [DispatchController::class, 'active']);
         Route::post('dispatches/{dispatch}/cancel', [DispatchController::class, 'cancel']);
-        Route::get('drivers/available', [DriverController::class, 'available']);
-        Route::get('drivers/{driver}/summary', [DriverController::class, 'summary']);
-        Route::get('trucks/available', [TruckController::class, 'available']);
-        Route::get('trucks/{truck}/utilization', [TruckController::class, 'utilization']);
         Route::post('transactions/pos-sale', [TransactionController::class, 'posSale']);
         Route::get('transactions/daily-total', [TransactionController::class, 'dailyTotal']);
         Route::get('transactions/by-payment-method', [TransactionController::class, 'byPaymentMethod']);

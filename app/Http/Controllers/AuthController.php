@@ -9,61 +9,170 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function showLoginForm(){
+    public function showLoginForm()
+    {
         return view('auth.login');
     }
-    public function login(Request $request){
+
+    public function login(Request $request)
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Flutter API Login
+        |--------------------------------------------------------------------------
+        |
+        | Flutter uses Username + Password.
+        | Username does NOT need to be an email address.
+        |
+        */
+
+        if ($request->expectsJson()) {
+
+            $validated = $request->validate([
+                'username' => 'required|string',
+                'password' => 'required|string',
+            ]);
+
+            $user = User::where('Username', $validated['username'])->first();
+
+            if (
+                !$user ||
+                !Hash::check(
+                    $validated['password'],
+                    $user->getAuthPassword()
+                )
+            ) {
+                return response()->json([
+                    'message' => 'Invalid username or password.'
+                ], 401);
+            }
+
+            // Update LastLoginAt
+            $user->markLoggedIn();
+
+            // Create Sanctum token
+            $token = $user->createToken('flutter-app')->plainTextToken;
+
+            return response()->json([
+                'message' => 'Logged in successfully.',
+
+                'user' => [
+                    'UserID'      => $user->UserID,
+                    'Name'        => $user->Name,
+                    'Username'    => $user->Username,
+                    'Email'       => $user->Email,
+                    'Role'        => $user->Role,
+                    'DriverID'    => $user->DriverID,
+                    'Status'      => $user->Status,
+                    'PhoneNumber' => $user->PhoneNumber,
+                ],
+
+                'token' => $token,
+            ]);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Laravel Web Login
+        |--------------------------------------------------------------------------
+        |
+        | Web login uses Email + Password.
+        | Email MUST be a valid email address.
+        |
+        */
+
         $validated = $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
-        if (! Auth::attempt(['Email' => $validated['email'], 'password' => $validated['password']])) {
-            if ($request->expectsJson()) {
-                return response()->json(['message' => 'Invalid credentials.'], 401);
-            }
-
-            return back()->withErrors([
-                'email' => 'Invalid credentials.',
-            ])->onlyInput('email');
+        if (
+            !Auth::attempt([
+                'Email'    => $validated['email'],
+                'password' => $validated['password'],
+            ])
+        ) {
+            return back()
+                ->withErrors([
+                    'email' => 'Invalid email or password.',
+                ])
+                ->onlyInput('email');
         }
 
         $user = Auth::user();
+
+        // Update LastLoginAt
         $user->markLoggedIn();
 
+        // Regenerate session
         $request->session()->regenerate();
 
-        if ($request->expectsJson()) {
-            // NEW: issue a Sanctum token so the Flutter app can authenticate
-            // future requests without relying on session cookies.
-            $token = $user->createToken('flutter-app')->plainTextToken;
-
-            return response()->json([
-                'message' => 'Logged in successfully.',
-                'user' => $user,
-                'token' => $token, // NEW
-            ]);
-        }
-
-        return redirect()->intended(route('deliveries.index'));
+        return redirect()->intended(
+            route('deliveries.index')
+        );
     }
 
-    public function logout(Request $request){
-        // NEW: revoke the current Sanctum token if this request was
-        // authenticated with one (i.e. came from the Flutter app).
-        if ($request->user() && $request->user()->currentAccessToken()) {
-            $request->user()->currentAccessToken()->delete();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logout
+    |--------------------------------------------------------------------------
+    */
+
+    public function logout(Request $request)
+    {
+        /*
+        | Revoke Sanctum token if this is a Flutter request.
+        */
+        if (
+            $request->user() &&
+            $request->user()->currentAccessToken()
+        ) {
+            $request->user()
+                ->currentAccessToken()
+                ->delete();
         }
 
-        Auth::logout();
+        /*
+        | Logout web session.
+        */
+        if ($request->hasSession()) {
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+            Auth::logout();
 
-        return response()->json(['message' => 'Logged out successfully.']);
+            $request->session()->invalidate();
+
+            $request->session()->regenerateToken();
+        }
+
+        return response()->json([
+            'message' => 'Logged out successfully.'
+        ]);
     }
 
-    public function me(Request $request){
-        return response()->json($request->user());
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current User
+    |--------------------------------------------------------------------------
+    */
+
+    public function me(Request $request)
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'user' => [
+                'UserID'      => $user->UserID,
+                'Name'        => $user->Name,
+                'Username'    => $user->Username,
+                'Email'       => $user->Email,
+                'Role'        => $user->Role,
+                'DriverID'    => $user->DriverID,
+                'Status'      => $user->Status,
+                'PhoneNumber' => $user->PhoneNumber,
+            ]
+        ]);
     }
 }

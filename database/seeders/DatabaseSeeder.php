@@ -39,31 +39,39 @@ class DatabaseSeeder extends Seeder
 
         // ----------------------------------------
         // 1. Users
-        // ----------------------------------------
-        $users = [
-            [
-                'Name'        => 'Admin123',
-                'Email'       => 'admin123@gmail.com',
-                'Password'    => Hash::make('Pass123'),
-                'Role'        => 'Admin',
-                'PhoneNumber' => '09064093019',
-            ],
-            [
-                'Name'        => 'Staff',
-                'Email'       => 'staff123@gmail.com',
-                'Password'    => Hash::make('Pass123'),
-                'Role'        => 'Staff',
-                'PhoneNumber' => '09774484907',
-            ],
-        ];
+// ----------------------------------------
+$users = [
+    [
+        'Name'        => 'Admin123',
+        'Username'    => 'admin123',
+        'Email'       => 'admin123@gmail.com',
+        'Password'    => Hash::make('Pass123'),
+        'Role'        => 'Admin',
+        'PhoneNumber' => '09064093019',
+        'DriverID'    => null,
+    ],
+    [
+        'Name'        => 'Staff',
+        'Username'    => 'staff123',
+        'Email'       => 'staff123@gmail.com',
+        'Password'    => Hash::make('Pass123'),
+        'Role'        => 'Staff',
+        'PhoneNumber' => '09774484907',
+        'DriverID'    => null,
+    ],
+];
 
-        foreach ($users as $user) {
-            DB::table('users')->insertGetId($user);
-        }
+foreach ($users as $user) {
+    DB::table('users')->insertGetId($user);
+}
 
-        $adminId = DB::table('users')->where('Email', 'admin123@gmail.com')->value('UserID');
-        $staffId = DB::table('users')->where('Email', 'staff123@gmail.com')->value('UserID');
+$adminId = DB::table('users')
+    ->where('Username', 'admin123')
+    ->value('UserID');
 
+$staffId = DB::table('users')
+    ->where('Username', 'staff123')
+    ->value('UserID');
         // ----------------------------------------
         // 2. Products – full list from OCS_inventory_completed.xlsx
         //    (Name, Category, SubCategory, SKU, Price all come straight
@@ -143,6 +151,38 @@ class DatabaseSeeder extends Seeder
             $d['updated_at'] = now();
             $driverIds[] = DB::table('drivers')->insertGetId($d);
         }
+
+        // ----------------------------------------
+        // 5.1 Driver Login Accounts
+        // ----------------------------------------
+
+        $juanDriverId = DB::table('drivers')
+            ->where('Name', 'Juan Dela Cruz')
+            ->value('DriverID');
+
+        DB::table('users')->insert([
+    'Name'        => 'Juan Dela Cruz',
+    'Username'    => 'Juan Dela Cruz',
+    'Email'       => 'juan@gmail.com',
+    'Password'    => Hash::make('Pass123'),
+    'Role'        => 'Driver',
+    'PhoneNumber' => '09111234567',
+    'DriverID'    => $juanDriverId,
+]);
+
+        $joseDriverId = DB::table('drivers')
+            ->where('Name', 'Jose Rizal')
+            ->value('DriverID');
+
+        DB::table('users')->insert([
+    'Name'        => 'Jose Rizal',
+    'Username'    => 'Jose Rizal',
+    'Email'       => 'jose@gmail.com',
+    'Password'    => Hash::make('Pass123'),
+    'Role'        => 'Driver',
+    'PhoneNumber' => '09144567890',
+            'DriverID'    => $joseDriverId,
+        ]);
 
         // ----------------------------------------
         // 6. Orders
@@ -225,6 +265,138 @@ class DatabaseSeeder extends Seeder
         }
 
         // ----------------------------------------
+       // ----------------------------------------
+// 8. Specific Test Deliveries
+// ----------------------------------------
+
+// Get the IDs we need
+$isuzuElfId = DB::table('trucks')
+    ->where('TruckName', 'Isuzu Elf')
+    ->value('TruckID');
+
+$juanDriverId = DB::table('drivers')
+    ->where('Name', 'Juan Dela Cruz')
+    ->value('DriverID');
+
+$joseHelperId = DB::table('drivers')
+    ->where('Name', 'Jose Rizal')
+    ->value('DriverID');
+
+
+// ============================================================
+// KATHERYN KSHLERIN
+// ============================================================
+
+$katherynOrderId = DB::table('orders')->insertGetId([
+    'CustomerName'  => 'Katheryn Kshlerin',
+    'Address'       => 'Customer Address',
+    'ContactNumber' => '09170000001',
+    'OrderDate'     => now(),
+    'PaymentStatus' => 'Unpaid',
+    'Status'        => 'Pending',
+    'Notes'         => 'Test pending delivery',
+    'CreatedBy'     => $staffId,
+    'created_at'    => now(),
+    'updated_at'    => now(),
+]);
+
+// Use the first available product
+$testProductId = $productIds[0];
+
+$katherynOrderItemId = DB::table('order_items')->insertGetId([
+    'OrderID'    => $katherynOrderId,
+    'ProductID'  => $testProductId,
+    'Quantity'   => 1,
+    'Status'     => 'Pending',
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
+
+// Create the pending dispatch
+$katherynDispatchId = DB::table('dispatches')->insertGetId([
+    'OrderItemID'        => $katherynOrderItemId,
+    'TruckID'            => $isuzuElfId,
+    'DispatchDate'       => now(),
+    'QuantityDispatched' => 1,
+    'Status'             => 'Pending',
+    'created_at'         => now(),
+    'updated_at'         => now(),
+]);
+
+// Assign Juan as DRIVER
+DB::table('dispatch_drivers')->insert([
+    'DispatchID' => $katherynDispatchId,
+    'DriverID'   => $juanDriverId,
+    'Role'       => 'Driver',
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
+
+// Assign Jose as HELPER
+DB::table('dispatch_drivers')->insert([
+    'DispatchID' => $katherynDispatchId,
+    'DriverID'   => $joseHelperId,
+    'Role'       => 'Helper',
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
+
+
+// ============================================================
+// JO COLLINS
+// ============================================================
+
+$joOrderId = DB::table('orders')->insertGetId([
+    'CustomerName'  => 'Jo Collins',
+    'Address'       => 'Customer Address',
+    'ContactNumber' => '09170000002',
+    'OrderDate'     => now(),
+    'PaymentStatus' => 'Unpaid',
+    'Status'        => 'Pending',
+    'Notes'         => 'Test pending delivery',
+    'CreatedBy'     => $staffId,
+    'created_at'    => now(),
+    'updated_at'    => now(),
+]);
+
+$joOrderItemId = DB::table('order_items')->insertGetId([
+    'OrderID'    => $joOrderId,
+    'ProductID'  => $testProductId,
+    'Quantity'   => 1,
+    'Status'     => 'Pending',
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
+
+// Create the pending dispatch
+$joDispatchId = DB::table('dispatches')->insertGetId([
+    'OrderItemID'        => $joOrderItemId,
+    'TruckID'            => $isuzuElfId,
+    'DispatchDate'       => now(),
+    'QuantityDispatched' => 1,
+    'Status'             => 'Pending',
+    'created_at'         => now(),
+    'updated_at'         => now(),
+]);
+
+// Assign Juan as DRIVER
+DB::table('dispatch_drivers')->insert([
+    'DispatchID' => $joDispatchId,
+    'DriverID'   => $juanDriverId,
+    'Role'       => 'Driver',
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
+
+// Assign Jose as HELPER
+DB::table('dispatch_drivers')->insert([
+    'DispatchID' => $joDispatchId,
+    'DriverID'   => $joseHelperId,
+    'Role'       => 'Helper',
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
+        // ----------------------------------------
         // 8. Transactions (for paid orders)
         // ----------------------------------------
         $paidOrderIds = DB::table('orders')->where('PaymentStatus', 'Paid')->pluck('OrderID');
@@ -299,6 +471,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->command->info('Database seeded successfully!');
+        $this->command->info('Juan Dela Cruz login: Juan Dela Cruz / Pass123 (DriverID: ' . $juanDriverId . ')');
+        $this->command->info('Jose Rizal login: Jose Rizal / Pass123 (DriverID: ' . $joseDriverId . ')');
+        $this->command->info('Pending delivery: Katheryn Kshlerin / Juan Dela Cruz / Jose Rizal / Isuzu Elf');
     }
 
     /**
