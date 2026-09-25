@@ -12,7 +12,7 @@ class Kernel extends ConsoleKernel
      * Define the application's command schedule.
      */
     protected function schedule(Schedule $schedule){
-        $schedule->job(new GenerateDailyReportJob)->dailyAt('23:59');
+        $schedule->job(new GenerateDailyReportJob)->dailyAt('17:00');
     }
 
     /**

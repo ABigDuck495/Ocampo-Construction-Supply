@@ -13,8 +13,14 @@ class ReportController extends Controller
 {
     public function index()
     {
+        $reports = Report::with([
+            'dispatches.orderItem.order',
+            'dispatches.truck',
+            'deliveries.dispatch.orderItem.order',
+        ])->latest('ReportDate')->paginate(20);
+
         return view('reports.index', [
-            'reports' => Report::latest('ReportDate')->paginate(20),
+            'reports' => $reports,
         ]);
     }
 
@@ -191,6 +197,33 @@ class ReportController extends Controller
             ->sortByDesc('unitsSold')
             ->values();
 
+        $reportSummaries = Report::with(['dispatches', 'deliveries'])
+            ->whereBetween('ReportDate', [$start->toDateString(), $end->toDateString()])
+            ->orderByDesc('ReportDate')
+            ->get()
+            ->map(function ($report) {
+                return [
+                    'date' => $report->ReportDate->format('F j, Y'),
+                    'generatedAt' => $report->GeneratedAt ? $report->GeneratedAt->format('M j, Y g:i A') : '—',
+                    'totalOrders' => (int) ($report->TotalOrders ?? 0),
+                    'totalSales' => (float) ($report->TotalSales ?? 0),
+                    'totalItemsSold' => (int) ($report->TotalItemsSold ?? 0),
+                    'totalDeliveries' => (int) ($report->TotalDeliveries ?? 0),
+                    'totalDispatches' => (int) ($report->TotalDispatches ?? 0),
+                    'lowStockItemCount' => (int) ($report->LowStockItemCount ?? 0),
+                    'dispatches' => $report->dispatches->map(fn($dispatch) => [
+                        'DispatchID' => $dispatch->DispatchID,
+                        'Status' => $dispatch->Status,
+                        'DispatchDate' => $dispatch->DispatchDate,
+                    ])->values()->all(),
+                    'deliveries' => $report->deliveries->map(fn($delivery) => [
+                        'DeliveryID' => $delivery->DeliveryID,
+                        'Status' => $delivery->Status,
+                        'DeliveryDate' => $delivery->DeliveryDate,
+                    ])->values()->all(),
+                ];
+            })->values()->all();
+
         return response()->json([
             'salesStats' => [
                 'totalRevenue' => $totalRevenue,
@@ -201,7 +234,8 @@ class ReportController extends Controller
             'topProducts' => $topProducts,
             'recentSales' => $recentSales,
             'itemsOrdered' => $itemsOrdered,
-            'deliveryHistory' => [], // pending: confirm Delivery/Dispatch schema
+            'deliveryHistory' => [],
+            'reportSummaries' => $reportSummaries,
             'range' => [
                 'month' => $start->format('F Y'),
                 'from' => $start->toDateString(),

@@ -33,11 +33,11 @@ class SystemSetting extends Model
     }
 
   
-    public static function get(string $key, mixed $default = null): mixed
+   public static function get(string $key, mixed $default = null): mixed
     {
         $setting = static::query()->where('Setting_Key', $key)->first();
 
-        return $setting ? static::castValue($setting->getAttribute('Setting_Value')) : $default;
+        return $setting ? static::castValue($setting->attributes['Setting_Value']) : $default;
     }
 
  
@@ -68,7 +68,7 @@ class SystemSetting extends Model
             return static::query()
                 ->get()
                 ->mapWithKeys(fn (self $setting) => [
-                    $setting->setting_key => static::castValue($setting->setting_value),
+                    $setting->attributes['Setting_Key'] => static::castValue($setting->attributes['Setting_Value']),
                 ])
                 ->all();
         });
@@ -77,27 +77,25 @@ class SystemSetting extends Model
  
     public static function grouped(): \Illuminate\Support\Collection
     {
-        
         $groupOrder = ['General', 'Inventory', 'Logistics', 'POS', 'Printer'];
-      
-        // Use the actual DB column names for ordering/grouping (migration uses PascalCase)
+
         return static::query()
             ->orderBy('Setting_Group')
             ->orderBy('Setting_Key')
-            
+            ->get()
             ->groupBy(function (self $setting) {
-                return $setting->getAttribute('Setting_Group') ?? 'General';
+                return $setting->attributes['Setting_Group'] ?? 'General';
             })
             ->sortBy(function ($settings, $group) use ($groupOrder) {
                 $pos = array_search($group, $groupOrder, true);
                 return $pos === false ? count($groupOrder) : $pos;
-            })->get();
+            });
     }
 
  
     public function inputType(): string
     {
-        $value = strtolower(trim((string) $this->getAttribute('Setting_Value')));
+        $value = strtolower(trim((string) ($this->attributes['Setting_Value'] ?? '')));
 
         if (in_array($value, ['true', 'false'], true)) {
             return 'boolean';
@@ -122,13 +120,13 @@ class SystemSetting extends Model
 
     public function getBoolValueAttribute(): bool
     {
-        return strtolower(trim((string) $this->getAttribute('Setting_Value'))) === 'true';
+        return strtolower(trim((string) ($this->attributes['Setting_Value'] ?? ''))) === 'true';
     }
 
     // Accessors & mutators to map PascalCase DB columns to snake_case properties
     public function getSettingKeyAttribute(): ?string
     {
-        return $this->getAttribute('Setting_Key') ?? null;
+        return $this->attributes['Setting_Key'] ?? null;
     }
 
     public function setSettingKeyAttribute($value): void
@@ -138,7 +136,7 @@ class SystemSetting extends Model
 
     public function getSettingValueAttribute(): ?string
     {
-        return $this->getAttribute('Setting_Value') ?? null;
+        return $this->attributes['Setting_Value'] ?? null;
     }
 
     public function setSettingValueAttribute($value): void
@@ -148,7 +146,7 @@ class SystemSetting extends Model
 
     public function getSettingGroupAttribute(): ?string
     {
-        return $this->getAttribute('Setting_Group') ?? null;
+        return $this->attributes['Setting_Group'] ?? null;
     }
 
     public function setSettingGroupAttribute($value): void
@@ -158,39 +156,11 @@ class SystemSetting extends Model
 
     public function getDescriptionAttribute(): ?string
     {
-        return $this->getAttribute('Setting_Description') ?? null;
+        return $this->attributes['Setting_Description'] ?? null;
     }
 
     public function setDescriptionAttribute($value): void
     {
         $this->attributes['Setting_Description'] = $value;
-    }
-
- 
-    protected static function castValue(string $value): mixed
-    {
-        $trimmed = trim($value);
-        $lower = strtolower($trimmed);
-
-        if ($lower === 'true') {
-            return true;
-        }
-        if ($lower === 'false') {
-            return false;
-        }
-        if (is_numeric($trimmed)) {
-            return str_contains($trimmed, '.') ? (float) $trimmed : (int) $trimmed;
-        }
-
-        return $value;
-    }
-
-    protected static function stringifyValue(mixed $value): string
-    {
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        return (string) $value;
     }
 }

@@ -1,6 +1,7 @@
 <?php
 namespace App\Jobs;
 
+use App\Models\Dispatch;
 use App\Models\Order;
 use App\Models\Transaction;
 use App\Models\Delivery;
@@ -36,7 +37,7 @@ class GenerateDailyReportJob implements ShouldQueue
 
         $totalOrders = Order::whereDate('OrderDate', $date)->count();
 
-        $totalSales = Transaction::whereDate('TransactionDate', $date)->sum('TotalAmount');
+        $totalSales = Transaction::whereDate('TransactionDate', $date)->sum('Amount');
 
         $totalItemsSold = Order::whereDate('OrderDate', $date)
             ->with('orderItems')
@@ -52,9 +53,11 @@ class GenerateDailyReportJob implements ShouldQueue
             ->whereIn('Status', ['Failed', 'Returned'])
             ->count();
 
+        $dispatchIds = Dispatch::whereDate('DispatchDate', $date)->pluck('DispatchID')->all();
+        $deliveryIds = Delivery::whereDate('DeliveryDate', $date)->pluck('DeliveryID')->all();
         $lowStockItemCount = Inventory::lowStock()->count();
 
-        return Report::create([
+        $report = Report::create([
             'ReportDate' => $date,
             'GeneratedAt' => now(),
             'TotalOrders' => $totalOrders,
@@ -62,7 +65,18 @@ class GenerateDailyReportJob implements ShouldQueue
             'TotalItemsSold' => $totalItemsSold,
             'TotalDeliveries' => $totalDeliveries,
             'TotalDeliveriesFailed' => $totalDeliveriesFailed,
+            'TotalDispatches' => count($dispatchIds),
             'LowStockItemCount' => $lowStockItemCount,
         ]);
+
+        if (!empty($dispatchIds)) {
+            $report->dispatches()->sync($dispatchIds);
+        }
+
+        if (!empty($deliveryIds)) {
+            $report->deliveries()->sync($deliveryIds);
+        }
+
+        return $report;
     }
 }

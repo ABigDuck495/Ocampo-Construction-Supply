@@ -105,8 +105,8 @@
 
             @php
                 $groupTitles = [
-                    'INVENTORY' => 'Inventory & Sourcing Controls',
-                    'LOGISTICS' => 'Logistics & Truck Capacity',
+                    'Inventory' => 'Inventory & Sourcing Controls',
+                    'Logistics' => 'Logistics & Truck Capacity',
                     'POS'       => 'POS & Transaction Behaviors',
                 ];
             @endphp

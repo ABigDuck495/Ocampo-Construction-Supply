@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
 
         // Truncate all tables (order matters due to foreign keys, but we'll truncate all)
         $tables = [
+            'report_deliveries', 'report_dispatches',
             'deliveries', 'dispatch_drivers', 'dispatches', 'order_items', 'orders',
             'transactions', 'inventory', 'products', 'drivers', 'trucks', 'users',
             'reports', 'sessions', 'jobs', 'job_batches', 'failed_jobs'
@@ -188,7 +189,7 @@ class DatabaseSeeder extends Seeder
                     $dispatchStatus = $faker->randomElement(['Pending', 'On Route', 'Delivered']);
                     $dispatchId = DB::table('dispatches')->insertGetId([
                         'OrderItemID'        => $orderItemId,
-                        'TruckID'            => $faker->optional(0.6)->randomElement($truckIds),
+                        'TruckID'            => $faker->randomElement($truckIds),
                         'DispatchDate'       => $faker->dateTimeBetween('-2 weeks', 'now'),
                         'QuantityDispatched' => $faker->numberBetween(1, $qty),
                         'Status'             => $dispatchStatus,
@@ -241,9 +242,10 @@ class DatabaseSeeder extends Seeder
         // ----------------------------------------
         // 9. Reports (daily summary)
         // ----------------------------------------
+        $reportIds = [];
         for ($day = 0; $day < 30; $day++) {
             $date = now()->subDays($day)->toDateString();
-            DB::table('reports')->insert([
+            $reportId = DB::table('reports')->insertGetId([
                 'ReportDate'      => $date,
                 'GeneratedAt'     => now(),
                 'TotalOrders'     => $faker->numberBetween(5, 30),
@@ -253,6 +255,35 @@ class DatabaseSeeder extends Seeder
                 'TotalDispatches' => $faker->numberBetween(10, 40),
                 'Notes'           => $faker->optional()->sentence,
             ]);
+            $reportIds[] = $reportId;
+        }
+
+        foreach ($reportIds as $reportId) {
+            $reportDate = DB::table('reports')->where('ReportID', $reportId)->value('ReportDate');
+
+            $dispatchIds = DB::table('dispatches')
+                ->whereDate('DispatchDate', $reportDate)
+                ->pluck('DispatchID')
+                ->all();
+
+            foreach ($dispatchIds as $dispatchId) {
+                DB::table('report_dispatches')->insert([
+                    'ReportID' => $reportId,
+                    'DispatchID' => $dispatchId,
+                ]);
+            }
+
+            $deliveryIds = DB::table('deliveries')
+                ->whereDate('DeliveryDate', $reportDate)
+                ->pluck('DeliveryID')
+                ->all();
+
+            foreach ($deliveryIds as $deliveryId) {
+                DB::table('report_deliveries')->insert([
+                    'ReportID' => $reportId,
+                    'DeliveryID' => $deliveryId,
+                ]);
+            }
         }
 
         // ----------------------------------------

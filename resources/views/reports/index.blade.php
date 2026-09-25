@@ -45,6 +45,12 @@
         </nav>
 
         <div class="sidebar-footer">
+            <a href="{{ route('settings.index') }}" class="nav-item {{ request()->routeIs('settings.*') ? 'active' : '' }}" style="display:block;margin-bottom:8px;">
+                <span class="lbl">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg>
+                    SETTINGS
+                </span>
+            </a>
             <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark mode">
                 <span class="theme-toggle-icon" id="themeIcon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -66,17 +72,17 @@
         <div class="header">
             <div>
                 <h1>REPORTS</h1>
-                <p>Sales performance &amp; delivery history</p>
+                <p>Daily summaries with detailed drill-downs</p>
             </div>
             <div class="header-stats" id="headerStats">
-    <div class="header-month-picker">
-        <select id="headerMonth"></select>
-        <select id="headerYear"></select>
-    </div>
-    <div class="hstat"><b id="statTotalRevenue">₱0.00</b><span>REVENUE</span></div>
-    <div class="hstat"><b id="statTotalOrders">0</b><span>ORDERS</span></div>
-    <div class="hstat"><b id="statAvgOrder">₱0.00</b><span>AVG ORDER</span></div>
-</div>
+                <div class="header-month-picker">
+                    <select id="headerMonth"></select>
+                    <select id="headerYear"></select>
+                </div>
+                <div class="hstat"><b id="statTotalRevenue">₱0.00</b><span>REVENUE</span></div>
+                <div class="hstat"><b id="statTotalOrders">0</b><span>ORDERS</span></div>
+                <div class="hstat"><b id="statAvgOrder">₱0.00</b><span>AVG ORDER</span></div>
+            </div>
         </div>
 
         <div class="tabs" id="reportTabs">
@@ -84,66 +90,64 @@
             <div class="tab" data-tab="delivery">DELIVERY HISTORY</div>
         </div>
 
-        <!-- ---------- SALES SUMMARY VIEW ---------- -->
         <div class="report-view active" id="view-sales">
-        <div class="filter-bar" id="filterBar">
-        <div class="filter-field">
-            <label>Report Type</label>
-            <select id="filterReportType">
-                <option value="orders" selected>Customer Orders</option>
-                <option value="items">Items Ordered</option>
-            </select>
-        </div>
-        <div class="filter-field">
-            <label>Month</label>
-            <select id="filterMonth">
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-            </select>
-        </div>
-        <div class="filter-field">
-            <label>Year</label>
-            <select id="filterYear"></select>
-        </div>
-        <div class="filter-actions">
-            <button type="button" id="btnGenerateReport" class="btn-primary">Generate Report</button>
-            <button type="button" id="btnExportPdf" class="btn-secondary">Export PDF</button>
-            <button type="button" id="btnExportCsv" class="btn-secondary">Export CSV</button>
-        </div>
-    </div>
+            <div class="filter-bar" id="filterBar">
+                <div class="filter-field">
+                    <label>Report Type</label>
+                    <select id="filterReportType">
+                        <option value="orders" selected>Customer Orders</option>
+                        <option value="items">Items Ordered</option>
+                    </select>
+                </div>
+                <div class="filter-field">
+                    <label>Month</label>
+                    <select id="filterMonth">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+                <div class="filter-field">
+                    <label>Year</label>
+                    <select id="filterYear"></select>
+                </div>
+                <div class="filter-actions">
+                    <button type="button" id="btnGenerateReport" class="btn-primary">Generate Report</button>
+                    <button type="button" id="btnExportPdf" class="btn-secondary">Export PDF</button>
+                    <button type="button" id="btnExportCsv" class="btn-secondary">Export CSV</button>
+                </div>
+            </div>
 
-    <div class="stat-cards">
-        <div class="stat-card">
-            <div class="stat-card-label">TOTAL REVENUE</div>
-            <div class="stat-card-value orange" id="cardRevenue">₱0.00</div>
-            <div class="stat-card-sub" id="cardRevenueRange">—</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-label">TOTAL ORDERS</div>
-            <div class="stat-card-value" id="cardOrders">0</div>
-            <div class="stat-card-sub" id="cardOrdersRange">—</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-label">AVG ORDER VALUE</div>
-            <div class="stat-card-value blue" id="cardAvg">₱0.00</div>
-            <div class="stat-card-sub">Per transaction</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-label">TOP CATEGORY</div>
-            <div class="stat-card-value green" id="cardCategory">—</div>
-            <div class="stat-card-sub">By units sold</div>
-        </div>
-    </div>
+            <div class="stat-cards">
+                <div class="stat-card">
+                    <div class="stat-card-label">TOTAL REVENUE</div>
+                    <div class="stat-card-value orange" id="cardRevenue">₱0.00</div>
+                    <div class="stat-card-sub" id="cardRevenueRange">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">TOTAL ORDERS</div>
+                    <div class="stat-card-value" id="cardOrders">0</div>
+                    <div class="stat-card-sub" id="cardOrdersRange">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">AVG ORDER VALUE</div>
+                    <div class="stat-card-value blue" id="cardAvg">₱0.00</div>
+                    <div class="stat-card-sub">Per transaction</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">TOP CATEGORY</div>
+                    <div class="stat-card-value green" id="cardCategory">—</div>
+                    <div class="stat-card-sub">By units sold</div>
+                </div>
             </div>
 
             <div class="sales-grid">
@@ -152,7 +156,6 @@
                     <div id="topProductsList"></div>
                 </div>
 
-                <!-- Shown when Report Type = Customer Orders -->
                 <div class="panel-box" id="panel-recentSales" data-report-panel="orders">
                     <div class="panel-box-title">RECENT SALES</div>
                     <div class="data-table-wrap">
@@ -172,7 +175,6 @@
                     </div>
                 </div>
 
-                <!-- Shown when Report Type = Items Ordered -->
                 <div class="panel-box" id="panel-itemsOrdered" data-report-panel="items" style="display: none;">
                     <div class="panel-box-title">ITEMS ORDERED</div>
                     <div class="data-table-wrap">
@@ -190,9 +192,10 @@
                     </div>
                 </div>
             </div>
+
+            <div class="report-summary-list" id="reportSummaryList"></div>
         </div>
 
-        <!-- ---------- DELIVERY HISTORY VIEW ---------- -->
         <div class="report-view" id="view-delivery">
             <div class="panel-box">
                 <div class="panel-box-title">DELIVERY HISTORY</div>

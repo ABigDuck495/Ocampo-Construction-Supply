@@ -12,8 +12,82 @@ let topProducts = [];
 let recentSales = [];
 let itemsOrdered = [];
 let deliveryHistory = [];
+let reportSummaries = [];
 
 function fmt(n){ return '$' + Number(n || 0).toFixed(2); }
+
+function renderReportSummaries(){
+    const list = document.getElementById('reportSummaryList');
+    if (!list) return;
+
+    if (!reportSummaries.length) {
+        list.innerHTML = '<div class="empty-state-box">No daily summaries yet</div>';
+        return;
+    }
+
+    list.innerHTML = reportSummaries.map((report, index) => `
+        <div class="report-summary-card ${index === 0 ? 'open' : ''}">
+            <button type="button" class="report-summary-header" data-report-index="${index}">
+                <div>
+                    <div class="report-date">${report.date}</div>
+                    <div class="report-meta">Generated ${report.generatedAt}</div>
+                </div>
+                <div class="report-kpis">
+                    <span><strong>${report.totalOrders}</strong> Orders</span>
+                    <span><strong>${fmt(report.totalSales)}</strong> Sales</span>
+                    <span><strong>${report.totalDeliveries}</strong> Delivered</span>
+                </div>
+                <span class="report-toggle-icon">${index === 0 ? '−' : '+'}</span>
+            </button>
+            <div class="report-summary-body">
+                <div class="summary-grid">
+                    <div class="summary-tile"><div class="summary-tile-label">Revenue</div><div class="summary-tile-value orange">${fmt(report.totalSales)}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Orders</div><div class="summary-tile-value">${report.totalOrders}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Items Sold</div><div class="summary-tile-value blue">${report.totalItemsSold}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Deliveries</div><div class="summary-tile-value green">${report.totalDeliveries}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Dispatches</div><div class="summary-tile-value">${report.totalDispatches ?? 0}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Low Stock</div><div class="summary-tile-value">${report.lowStockItemCount ?? 0}</div></div>
+                </div>
+                <div class="detail-list">
+                    <div class="detail-panel">
+                        <h4>Dispatches</h4>
+                        <div class="detail-items">
+                            ${report.dispatches && report.dispatches.length ? report.dispatches.map(d => `
+                                <div class="detail-item"><span>#${d.DispatchID} · ${d.Status}</span><span>${d.DispatchDate ? new Date(d.DispatchDate).toLocaleDateString() : '—'}</span></div>
+                            `).join('') : '<div class="detail-item"><span>No dispatches</span><span>—</span></div>'}
+                        </div>
+                    </div>
+                    <div class="detail-panel">
+                        <h4>Deliveries</h4>
+                        <div class="detail-items">
+                            ${report.deliveries && report.deliveries.length ? report.deliveries.map(d => `
+                                <div class="detail-item"><span>#${d.DeliveryID} · ${d.Status}</span><span>${d.DeliveryDate ? new Date(d.DeliveryDate).toLocaleDateString() : '—'}</span></div>
+                            `).join('') : '<div class="detail-item"><span>No deliveries</span><span>—</span></div>'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    document.querySelectorAll('.report-summary-header').forEach(button => {
+        button.addEventListener('click', () => {
+            const card = button.closest('.report-summary-card');
+            const isOpen = card.classList.contains('open');
+            document.querySelectorAll('.report-summary-card').forEach(item => {
+                item.classList.remove('open');
+                const icon = item.querySelector('.report-toggle-icon');
+                if (icon) icon.textContent = '+';
+            });
+
+            if (!isOpen) {
+                card.classList.add('open');
+                const icon = card.querySelector('.report-toggle-icon');
+                if (icon) icon.textContent = '−';
+            }
+        });
+    });
+}
 
 /* ---------------- RENDER: SALES SUMMARY (filtered stat cards) ---------------- */
 function renderSalesStats(){
@@ -167,12 +241,14 @@ async function fetchReportsData(){
         recentSales = data.recentSales;
         itemsOrdered = data.itemsOrdered || [];
         deliveryHistory = data.deliveryHistory;
+        reportSummaries = data.reportSummaries || [];
 
         renderSalesStats();
         renderTopProducts();
         renderRecentSales();
         renderItemsOrdered();
         renderDeliveryHistory();
+        renderReportSummaries();
         toggleReportTypePanels();
     } catch (err) {
         console.error(err);

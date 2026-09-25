@@ -20,7 +20,6 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-
 Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('deliveries.index');
@@ -36,14 +35,12 @@ Route::get('auth/login', [LoginController::class, 'showLoginForm']);
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->name('login');
+
     Route::middleware(['auth'])->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('me', [AuthController::class, 'me'])->name('auth.me');
     });
 });
-
-Route::get('/pos', [PosController::class, 'index'])->name('pos.index'); ///////////////tanggalin 
-
 
 Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:Admin,Staff'])->group(function () {
@@ -62,13 +59,6 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('drivers', DriverController::class);
         Route::resource('trucks', TruckController::class);
         Route::resource('transactions', TransactionController::class);
-        // NOTE: Route::resource('reports', ReportController::class) intentionally removed.
-        // It registered GET /reports/{report}, which matched BEFORE the explicit
-        // /reports/data and /reports/summary routes below (Laravel matches top to
-        // bottom), swallowing "data" and "summary" as fake {report} IDs and causing
-        // 404s. All report-related actions actually used (index/data/summary/export/
-        // generate-now/for-date/trend) are already declared explicitly further down,
-        // so the resource route wasn't needed.
         Route::resource('users', UserController::class);
         Route::resource('pos', PosController::class);
         Route::get('products/search', [ProductController::class, 'search']);
