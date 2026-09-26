@@ -123,7 +123,10 @@ function renderStats(){
         headerSub.textContent = customText || `${orders.length} orders · ${trucks.length} trucks`;
     }
 
-    document.getElementById('sidebarBadge').textContent = pending + assigned + transit;
+    const sidebarBadge = document.getElementById('sidebarBadge');
+    if (sidebarBadge) {
+        sidebarBadge.textContent = pending + assigned + transit;
+}
 
     document.querySelector('.cnt-all').textContent = orders.length;
     document.querySelector('.cnt-pending').textContent = pending;

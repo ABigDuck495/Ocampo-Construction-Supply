@@ -18,22 +18,22 @@ class DeliveryController extends Controller
      * Display a listing of the resource.
      */
     public function index()
-{
-    $orders = OrderItem::with(['order', 'product'])
-        ->whereHas('order', function ($q) {
-            $q->whereNotIn('Status', ['Completed', 'Cancelled']);
-        })
-        ->get();
+    {
+        $orders = OrderItem::with(['order', 'product'])
+            ->whereHas('order', function ($q) {
+                $q->whereNotIn('Status', ['Completed', 'Cancelled']);
+            })
+            ->get();
 
-    $trucks = Truck::with(['dispatches.drivers'])->get();
-    $drivers = Driver::all();
+        $trucks = Truck::with(['dispatches.drivers'])->get();
+        $drivers = Driver::all();
 
-    $systemSettings = \Illuminate\Support\Facades\DB::table('system_settings')
-            ->pluck('Setting_Value', 'Setting_Key')
-            ->toArray();
+        $systemSettings = \Illuminate\Support\Facades\DB::table('system_settings')
+                ->pluck('Setting_Value', 'Setting_Key')
+                ->toArray();
 
-    return view('deliveries.index', compact('orders', 'trucks', 'systemSettings', 'drivers'));
-}
+        return view('deliveries.index', compact('orders', 'trucks', 'systemSettings', 'drivers'));
+    }
 
     /**
      * Show the form for creating a new resource.
@@ -65,12 +65,12 @@ class DeliveryController extends Controller
 
             if ($validated['Status'] === 'Failed') {
                 $dispatch->update(['Status' => 'Pending']);
-                $dispatch->truck()->update(['Status' => 'Available']);
+                $dispatch->truck()->update(['Status' => 'Idle']);
 
                 return $delivery->load('dispatch');
             }
 
-            $dispatch->truck()->update(['Status' => 'Available']);
+            $dispatch->truck()->update(['Status' => 'Idle']);
             $dispatch->update(['Status' => 'Delivered']);
             $product = $dispatch->orderItem->product;
             $product->inventory?->deduct($validated['QuantityDelivered']);
@@ -132,6 +132,7 @@ class DeliveryController extends Controller
 
         return response()->json(['message' => 'Delivery deleted successfully.'], 200);
     }
+
     public function failedDeliveries(){
         return Delivery::failed()->with('dispatch.orderItem.order')->get();
     }

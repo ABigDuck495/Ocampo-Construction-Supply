@@ -34,7 +34,7 @@
             POS</span></a>
         <a href="{{ route('deliveries.index') }}" class="nav-item active"><span class="lbl">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="17.5" cy="19" r="1.5"/></svg>
-            DELIVERY</span></a>
+            DELIVERY <span id="sidebarBadge"></span></span></a>
         <a href="{{ route('inventory.index') }}" class="nav-item"><span class="lbl">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v4H3z"/><path d="M5 7v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
             INVENTORY</span></a>
@@ -79,18 +79,18 @@
 
         </div>
         <div class="header-stats">
-            <div class="hstat"><b id="statPending">3</b><span>PENDING</span></div>
-            <div class="hstat"><b id="statTransit">2</b><span>TRANSIT</span></div>
-            <div class="hstat"><b id="statDone">0</b><span>DONE</span></div>
+            <div class="hstat"><b id="statPending"></b><span>PENDING</span></div>
+            <div class="hstat"><b id="statTransit"></b><span>TRANSIT</span></div>
+            <div class="hstat"><b id="statDone"></b><span>DONE</span></div>
         </div>
     </div>
 
     <div class="tabs" id="tabs">
-        <div class="tab active" data-tab="all">ALL (<span class="cnt-all">5</span>)</div>
-        <div class="tab" data-tab="pending">PENDING (<span class="cnt-pending">3</span>)</div>
-        <div class="tab" data-tab="transit">TRANSIT (<span class="cnt-transit">2</span>)</div>
-        <div class="tab" data-tab="assigned">PARTIAL (<span class="cnt-assigned">0</span>)</div>
-        <div class="tab" data-tab="delivered">DELIVERED (<span class="cnt-delivered">0</span>)</div>
+        <div class="tab active" data-tab="all">ALL (<span class="cnt-all"></span>)</div>
+        <div class="tab" data-tab="pending">PENDING (<span class="cnt-pending"></span>)</div>
+        <div class="tab" data-tab="transit">TRANSIT (<span class="cnt-transit"></span>)</div>
+        <div class="tab" data-tab="assigned">PARTIAL (<span class="cnt-assigned"></span>)</div>
+        <div class="tab" data-tab="delivered">DELIVERED (<span class="cnt-delivered"></span>)</div>
     </div>
     <div class="hint">&middot; Drag orders onto trucks &middot;</div>
 

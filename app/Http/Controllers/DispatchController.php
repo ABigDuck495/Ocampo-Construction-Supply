@@ -120,7 +120,7 @@ class DispatchController extends Controller
     }
     public function cancel(Dispatch $dispatch){
         $dispatch->update(['Status' => 'Pending']);
-        $dispatch->truck()->update(['Status' => 'Available']);
+        $dispatch->truck()->update(['Status' => 'Idle']);
         return $dispatch;
     }
     public function unassignedItems()

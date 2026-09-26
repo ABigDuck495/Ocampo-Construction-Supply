@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,12 +20,12 @@
 
     <!-- sidebar.css loads BEFORE the page-specific stylesheet, same as reports.blade,
         so inventory.css can safely override without fighting the shared .main rules -->
-    @vite(['resources/css/sidebar.css', 'resources/css/inventory.css'])
-    </head>
-    <body>
+    @vite(['resources/css/deliveries.css','resources/css/sidebar.css', 'resources/css/inventory.css'])
+</head>
+<body>
 
     <!-- ============================================================
-        SIDEBAR (identical to other pages - Inventory tab active here)
+        SIDEBAR
         ============================================================ -->
     <aside class="sidebar">
         <div class="brand">
@@ -32,7 +34,7 @@
             </div>
             <div>
                 <div class="brand-name">Ocampo Construction and Hardware Supplies</div>
-                <div class="brand-sub">POS</div>
+                <div class="brand-sub">INVENTORY</div>
             </div>
         </div>
         <nav class="nav">
@@ -276,5 +278,5 @@
 
     <!-- Separated scripts -->
     @vite(['resources/js/pages/inventory.js', 'resources/js/pages/sidebar.js', 'resources/js/pages/inventory-add-product.js', 'resources/js/pages/inventory-edit-product.js'])
-    </body>
-    </html>
+</body>
+</html>
