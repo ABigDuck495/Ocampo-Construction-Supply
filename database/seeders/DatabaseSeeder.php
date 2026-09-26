@@ -124,10 +124,11 @@ $staffId = DB::table('users')
         // ----------------------------------------
         // 4. Trucks
         // ----------------------------------------
+        // Use statuses compatible with the current `trucks.Status` enum
         $trucks = [
-            ['TruckName' => 'Isuzu Elf',       'PlateNumber' => 'ABC-1234', 'Capacity' => 4.5, 'Status' => 'Available'],
-            ['TruckName' => 'Mitsubishi Fuso', 'PlateNumber' => 'XYZ-5678', 'Capacity' => 8.0, 'Status' => 'Available'],
-            ['TruckName' => 'Ford Transit',    'PlateNumber' => 'DEF-9012', 'Capacity' => 3.0, 'Status' => 'Unavailable'],
+            ['TruckName' => 'Isuzu Elf',       'PlateNumber' => 'ABC-1234', 'Capacity' => 4.5, 'Status' => 'Idle'],
+            ['TruckName' => 'Mitsubishi Fuso', 'PlateNumber' => 'XYZ-5678', 'Capacity' => 8.0, 'Status' => 'Idle'],
+            ['TruckName' => 'Ford Transit',    'PlateNumber' => 'DEF-9012', 'Capacity' => 3.0, 'Status' => 'Maintenance'],
         ];
         $truckIds = [];
         foreach ($trucks as $t) {
@@ -136,6 +137,11 @@ $staffId = DB::table('users')
             $truckIds[] = DB::table('trucks')->insertGetId($t);
         }
 
+        // Track whether a truck already has an active dispatch (Pending or On Route)
+        $truckActive = [];
+        foreach ($truckIds as $tid) {
+            $truckActive[$tid] = false;
+        }
         // ----------------------------------------
         // 5. Drivers
         // ----------------------------------------
@@ -227,9 +233,31 @@ $staffId = DB::table('users')
 
                 if ($faker->boolean(70)) {
                     $dispatchStatus = $faker->randomElement(['Pending', 'On Route', 'Delivered']);
+
+                    // If the dispatch would be active, ensure we pick a truck without another active dispatch
+                    if (in_array($dispatchStatus, ['Pending', 'On Route'])) {
+                        $availableTruckIds = [];
+                        foreach ($truckIds as $tid) {
+                            if (!($truckActive[$tid] ?? false)) {
+                                $availableTruckIds[] = $tid;
+                            }
+                        }
+
+                        if (empty($availableTruckIds)) {
+                            // no trucks free for an active dispatch — mark this one as Delivered instead
+                            $dispatchStatus = 'Delivered';
+                            $truckId = $faker->randomElement($truckIds);
+                        } else {
+                            $truckId = $faker->randomElement($availableTruckIds);
+                            $truckActive[$truckId] = true;
+                        }
+                    } else {
+                        $truckId = $faker->randomElement($truckIds);
+                    }
+
                     $dispatchId = DB::table('dispatches')->insertGetId([
                         'OrderItemID'        => $orderItemId,
-                        'TruckID'            => $faker->randomElement($truckIds),
+                        'TruckID'            => $truckId,
                         'DispatchDate'       => $faker->dateTimeBetween('-2 weeks', 'now'),
                         'QuantityDispatched' => $faker->numberBetween(1, $qty),
                         'Status'             => $dispatchStatus,
@@ -312,13 +340,31 @@ $katherynOrderItemId = DB::table('order_items')->insertGetId([
     'updated_at' => now(),
 ]);
 
-// Create the pending dispatch
+// Create the pending dispatch (ensure the truck doesn't already have an active dispatch)
+$katherynDesiredTruck = $isuzuElfId;
+if (!($truckActive[$katherynDesiredTruck] ?? false)) {
+    $katherynTruck = $katherynDesiredTruck;
+    $truckActive[$katherynTruck] = true;
+} else {
+    $fallback = array_values(array_filter($truckIds, fn($id) => $id !== $katherynDesiredTruck && !($truckActive[$id] ?? false)));
+    if (!empty($fallback)) {
+        $katherynTruck = $fallback[0];
+        $truckActive[$katherynTruck] = true;
+    } else {
+        // no trucks available — create as Delivered on the desired truck
+        $katherynTruck = $katherynDesiredTruck;
+        $katherynStatus = 'Delivered';
+    }
+}
+
+if (!isset($katherynStatus)) { $katherynStatus = 'Pending'; }
+
 $katherynDispatchId = DB::table('dispatches')->insertGetId([
     'OrderItemID'        => $katherynOrderItemId,
-    'TruckID'            => $isuzuElfId,
+    'TruckID'            => $katherynTruck,
     'DispatchDate'       => now(),
     'QuantityDispatched' => 1,
-    'Status'             => 'Pending',
+    'Status'             => $katherynStatus,
     'created_at'         => now(),
     'updated_at'         => now(),
 ]);
@@ -368,13 +414,30 @@ $joOrderItemId = DB::table('order_items')->insertGetId([
     'updated_at' => now(),
 ]);
 
-// Create the pending dispatch
+// Create the pending dispatch for Jo (avoid duplicating an active dispatch on the same truck)
+$joDesiredTruck = $isuzuElfId;
+if (!($truckActive[$joDesiredTruck] ?? false)) {
+    $joTruck = $joDesiredTruck;
+    $truckActive[$joTruck] = true;
+} else {
+    $fallback = array_values(array_filter($truckIds, fn($id) => $id !== $joDesiredTruck && !($truckActive[$id] ?? false)));
+    if (!empty($fallback)) {
+        $joTruck = $fallback[0];
+        $truckActive[$joTruck] = true;
+    } else {
+        $joTruck = $joDesiredTruck;
+        $joStatus = 'Delivered';
+    }
+}
+
+if (!isset($joStatus)) { $joStatus = 'Pending'; }
+
 $joDispatchId = DB::table('dispatches')->insertGetId([
     'OrderItemID'        => $joOrderItemId,
-    'TruckID'            => $isuzuElfId,
+    'TruckID'            => $joTruck,
     'DispatchDate'       => now(),
     'QuantityDispatched' => 1,
-    'Status'             => 'Pending',
+    'Status'             => $joStatus,
     'created_at'         => now(),
     'updated_at'         => now(),
 ]);

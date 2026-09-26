@@ -31,6 +31,9 @@ class Inventory extends Model
             throw new \Exception('Insufficient stock for product ID: ' . $this->ProductID);
         }
     }
+    public function deduct($quantity){
+        return $this->deductQuantity($quantity);
+    }
     public function addQuantity($quantity){
         $this->QuantityOnHand += $quantity;
         $this->save();

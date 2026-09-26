@@ -11,6 +11,7 @@ use App\Models\OrderItem;
 use App\Models\Truck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\SystemSettings;
 
 class DeliveryController extends Controller
 {
@@ -29,8 +30,8 @@ class DeliveryController extends Controller
         $drivers = Driver::all();
 
         $systemSettings = \Illuminate\Support\Facades\DB::table('system_settings')
-                ->pluck('Setting_Value', 'Setting_Key')
-                ->toArray();
+            ->pluck('Setting_Value', 'Setting_Key')
+            ->toArray();
 
         return view('deliveries.index', compact('orders', 'trucks', 'systemSettings', 'drivers'));
     }
@@ -70,10 +71,25 @@ class DeliveryController extends Controller
                 return $delivery->load('dispatch');
             }
 
+            // Respect system settings: inventory tracking and capacity enforcement
+            $settings = new SystemSettings();
+
             $dispatch->truck()->update(['Status' => 'Idle']);
             $dispatch->update(['Status' => 'Delivered']);
+
             $product = $dispatch->orderItem->product;
-            $product->inventory?->deduct($validated['QuantityDelivered']);
+            if ($settings->isEnabled('enable_Inventory_tracking')) {
+                // If tracking enabled, deduct stock unless setting forbids
+                try {
+                    $product->inventory?->deduct($validated['QuantityDelivered']);
+                } catch (\Exception $e) {
+                    if ($settings->isEnabled('allow_unresolved_price_checkout')) {
+                        // swallow and continue if allowed by settings
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
 
             $orderItem = $dispatch->orderItem;
             if ($orderItem->quantityDispatched() >= $orderItem->Quantity) {

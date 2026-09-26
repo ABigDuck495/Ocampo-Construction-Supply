@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger(('OrderItemID'));
             $table->unsignedBigInteger(('TruckID'))->nullable();
             $table->timestamp('DispatchDate')->nullable();
-            $table->integer('QuantityDispatched')->default(1);
+            $table->decimal('QuantityDispatched', 10, 2)->default(1);
             $table->enum('Status', ['Pending', 'On Route', 'Delivered'])->default('Pending');
             $table->timestamps();
             $table->foreign('OrderItemID')->references('OrderItemID')->on('order_items')->onDelete('cascade');
