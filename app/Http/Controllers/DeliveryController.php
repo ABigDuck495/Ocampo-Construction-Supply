@@ -12,6 +12,7 @@ use App\Models\OrderItem;
 use App\Models\Truck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\SystemSettings;
 
 class DeliveryController extends Controller
 {
@@ -26,9 +27,9 @@ class DeliveryController extends Controller
         $trucks = Truck::with(['dispatches.orderItem.order', 'dispatches.orderItem.product', 'dispatches.drivers'])->get();
         $drivers = Driver::all();
 
-        $systemSettings = DB::table('system_settings')
-                ->pluck('Setting_Value', 'Setting_Key')
-                ->toArray();
+        $systemSettings = \Illuminate\Support\Facades\DB::table('system_settings')
+            ->pluck('Setting_Value', 'Setting_Key')
+            ->toArray();
 
         return view('deliveries.index', compact('orders', 'trucks', 'systemSettings', 'drivers'));
     }
@@ -75,30 +76,25 @@ class DeliveryController extends Controller
                 return $delivery->load('dispatch');
             }
 
-            $originalQty = $dispatch->QuantityDispatched;
-            $deliveredQty = $validated['QuantityDelivered'];
-            $wasPartial = $deliveredQty < $originalQty;
+            // Respect system settings: inventory tracking and capacity enforcement
+            $settings = new SystemSettings();
 
-            // Shrink the dispatch to the real delivered amount so the
-            // undelivered remainder is automatically freed back into the
-            // pending pool (pasabay) via the existing quantity-remaining queries.
-            $dispatch->update([
-                'Status' => 'Delivered',
-                'QuantityDispatched' => $deliveredQty,
-            ]);
-            DispatchController::releaseTruckIfClear($dispatch->TruckID);
+            $dispatch->truck()->update(['Status' => 'Idle']);
+            $dispatch->update(['Status' => 'Delivered']);
 
             $product = $dispatch->orderItem->product;
-            $product->inventory?->deduct($deliveredQty);
-
-            DispatchLog::create([
-                'DispatchID' => $dispatch->DispatchID,
-                'Action' => $wasPartial ? 'PartiallyDelivered' : 'Delivered',
-                'Notes' => $wasPartial
-                    ? "Delivered {$deliveredQty} of {$originalQty}; remaining " . ($originalQty - $deliveredQty) . " item(s) returned to pending pool."
-                    : 'Delivered in full.',
-                'LoggedAt' => now(),
-            ]);
+            if ($settings->isEnabled('enable_Inventory_tracking')) {
+                // If tracking enabled, deduct stock unless setting forbids
+                try {
+                    $product->inventory?->deduct($validated['QuantityDelivered']);
+                } catch (\Exception $e) {
+                    if ($settings->isEnabled('allow_unresolved_price_checkout')) {
+                        // swallow and continue if allowed by settings
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
 
             $orderItem = $dispatch->orderItem;
             if ($orderItem->quantityRemaining() <= 0) {

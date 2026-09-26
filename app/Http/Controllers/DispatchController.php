@@ -9,6 +9,7 @@ use App\Models\OrderItem;
 use App\Models\Truck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\SystemSettings;
 
 class DispatchController extends Controller
 {
@@ -44,8 +45,13 @@ class DispatchController extends Controller
         return DB::transaction(function () use ($validated) {
             $orderItem = OrderItem::findOrFail($validated['OrderItemID']);
 
-            if ($validated['QuantityDispatched'] > $orderItem->quantityRemaining()) {
-                abort(422, 'Quantity exceeds remaining order item quantity.');
+            // Guard: don't dispatch more than what's left
+            // Compare quantities with a 2-decimal tolerance to avoid float precision issues
+            $remaining = round(max(0, $orderItem->quantityRemaining()), 2);
+            $requested = round((float) $validated['QuantityDispatched'], 2);
+            $tolerance = 0.01; // quantities are stored with 2 decimals
+            if ($requested > $remaining + $tolerance) {
+                abort(422, 'Quantity exceeds remaining order item quantity. Requested: ' . $requested . ' Remaining: ' . $remaining);
             }
 
             $dispatch = Dispatch::create([
