@@ -29,7 +29,7 @@ class DriverDeliveryController extends Controller
         }
 
         $dispatches = Dispatch::with(['orderItem.order', 'orderItem.product', 'truck', 'drivers'])
-            ->whereHas('drivers', fn ($q) => $q->where('DriverID', $driverId))
+            ->whereHas('drivers', fn ($q) => $q->where('drivers.DriverID', $driverId))
             ->whereIn('Status', ['Pending', 'On Route'])
             ->orderByRaw("FIELD(Status, 'On Route', 'Pending')")
             ->orderBy('DispatchDate')
@@ -159,7 +159,7 @@ class DriverDeliveryController extends Controller
 
     private function isAssignedToDriver(Dispatch $dispatch, $driverId): bool
     {
-        return $dispatch->drivers()->where('DriverID', $driverId)->exists();
+        return $dispatch->drivers()->where('drivers.DriverID', $driverId)->exists();
     }
 
     private function formatDispatch(Dispatch $dispatch, $driverId): array
