@@ -1,3 +1,13 @@
+ <script>
+        (function() {
+            try {
+                if (localStorage.getItem('theme') === 'light') {
+                    document.documentElement.classList.add('light-mode-pending');
+                }
+            } catch (e) {}
+        })();
+    </script>
+
 <aside class="sidebar">
     <div class="brand">
         <div class="brand-icon">

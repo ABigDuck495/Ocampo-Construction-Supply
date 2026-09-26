@@ -12,10 +12,13 @@ class Dispatch extends Model
         'OrderItemID',
         'TruckID',
         'DispatchDate',
+        'AcceptedAt',
         'QuantityDispatched',
         'Status',
     ];
     protected $guarded = ['DispatchID'];
+    protected $casts = ['AcceptedAt' => 'datetime'];
+
     public function orderItem()
     {
         return $this->belongsTo(OrderItem::class, 'OrderItemID', 'OrderItemID');
@@ -30,9 +33,15 @@ class Dispatch extends Model
     public function drivers(){
         return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'DispatchID', 'DriverID')->withPivot('Role');
     }
+    public function logs(){
+        return $this->hasMany(DispatchLog::class, 'DispatchID', 'DispatchID')->orderBy('LoggedAt');
+    }
     public function mainDriver(){
         return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'DispatchID', 'DriverID')
             ->wherePivot('Role', 'Driver');
+    }
+    public function scopePending($query){
+        return $query->where('Status', 'Pending');
     }
     public function scopeOnRoute($query){
         return $query->where('Status', 'On Route');

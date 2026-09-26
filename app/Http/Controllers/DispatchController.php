@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dispatch;
+use App\Models\DispatchLog;
 use App\Models\OrderItem;
 use App\Models\Truck;
 use Illuminate\Http\Request;
@@ -11,28 +12,23 @@ use Illuminate\Support\Facades\DB;
 
 class DispatchController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(){
-            $orders = OrderItem::whereRaw('CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID)') // your unassignedItems() logic
+        $orders = OrderItem::whereRaw('CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID AND dispatches.Status != \'Failed\')')
             ->with('product', 'order')
             ->get();
-        $trucks = Truck::with('dispatches.orderItem.order', 'dispatches.drivers')->get();
+        $trucks = Truck::with('dispatches.orderItem.order', 'dispatches.orderItem.product', 'dispatches.drivers')->get();
 
         return view('deliveries.index', compact('orders', 'trucks'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         return response()->json(['message' => 'Create dispatch endpoint.'], 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Creates the dispatch as "Pending" — awaiting the driver's acceptance
+     * on their device. Truck moves to "Loading" until accepted.
      */
     public function store(Request $request){
          $validated = $request->validate([
@@ -48,7 +44,6 @@ class DispatchController extends Controller
         return DB::transaction(function () use ($validated) {
             $orderItem = OrderItem::findOrFail($validated['OrderItemID']);
 
-            // Guard: don't dispatch more than what's left
             if ($validated['QuantityDispatched'] > $orderItem->quantityRemaining()) {
                 abort(422, 'Quantity exceeds remaining order item quantity.');
             }
@@ -58,44 +53,42 @@ class DispatchController extends Controller
                 'TruckID' => $validated['TruckID'],
                 'DispatchDate' => $validated['DispatchDate'],
                 'QuantityDispatched' => $validated['QuantityDispatched'],
-                'Status' => 'On Route',
+                'Status' => 'Pending',
             ]);
 
             foreach ($validated['drivers'] as $driver) {
                 $dispatch->drivers()->attach($driver['DriverID'], ['Role' => $driver['Role']]);
             }
 
-            $dispatch->truck()->update(['Status' => 'On Route']);
+            $dispatch->truck()->update(['Status' => 'Loading']);
+
+            DispatchLog::create([
+                'DispatchID' => $dispatch->DispatchID,
+                'Action' => 'Dispatched',
+                'Notes' => 'Assigned to truck, awaiting driver acceptance.',
+                'LoggedAt' => now(),
+            ]);
 
             return $dispatch->load('drivers', 'truck', 'orderItem');
         });
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Dispatch $dispatch){
-        return $dispatch->load('truck', 'drivers', 'orderItem.order', 'delivery');
+        return $dispatch->load('truck', 'drivers', 'orderItem.order', 'delivery', 'logs');
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(string $id)
     {
         return Dispatch::with('truck', 'drivers', 'orderItem.product', 'delivery')->findOrFail($id);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
             'TruckID' => 'sometimes|required|exists:trucks,TruckID',
             'QuantityDispatched' => 'sometimes|required|integer|min:1',
             'DispatchDate' => 'sometimes|required|date',
-            'Status' => 'sometimes|required|in:Pending,On Route,Delivered',
+            'Status' => 'sometimes|required|in:Pending,On Route,Delivered,Failed',
         ]);
 
         $dispatch = Dispatch::findOrFail($id);
@@ -105,9 +98,6 @@ class DispatchController extends Controller
         return $dispatch->load('truck', 'drivers', 'orderItem.product', 'delivery');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         $dispatch = Dispatch::findOrFail($id);
@@ -115,18 +105,51 @@ class DispatchController extends Controller
 
         return response()->json(['message' => 'Dispatch deleted successfully.'], 200);
     }
+
     public function active(){
         return Dispatch::onRoute()->with('truck', 'drivers', 'orderItem.order')->get();
     }
+
+    /**
+     * Staff-side cancel (before or after acceptance). Frees the item back
+     * into the pending pool and releases the truck if nothing else is on it.
+     */
     public function cancel(Dispatch $dispatch){
-        $dispatch->update(['Status' => 'Pending']);
-        $dispatch->truck()->update(['Status' => 'Idle']);
-        return $dispatch;
+        return DB::transaction(function () use ($dispatch) {
+            $dispatch->update(['Status' => 'Failed']);
+            self::releaseTruckIfClear($dispatch->TruckID);
+
+            DispatchLog::create([
+                'DispatchID' => $dispatch->DispatchID,
+                'Action' => 'Failed',
+                'Notes' => 'Cancelled by staff.',
+                'LoggedAt' => now(),
+            ]);
+
+            return $dispatch;
+        });
     }
+
     public function unassignedItems()
-{
-    return OrderItem::whereRaw(
-        'CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatch WHERE dispatch.OrderItemID = order_items.OrderItemID)'
-    )->with('product', 'order')->get();
-}
+    {
+        return OrderItem::whereRaw(
+            'CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID AND dispatches.Status != \'Failed\')'
+        )->with('product', 'order')->get();
+    }
+
+    /**
+     * Sets a truck back to Idle once it has no more Pending or On Route
+     * dispatches attached to it. Called after any dispatch is resolved
+     * (delivered, partially delivered, failed, or cancelled).
+     */
+    public static function releaseTruckIfClear($truckId): void
+    {
+        $stillActive = Dispatch::where('TruckID', $truckId)
+            ->whereIn('Status', ['Pending', 'On Route'])
+            ->exists();
+
+        if (!$stillActive) {
+            Truck::where('TruckID', $truckId)->update(['Status' => 'Idle']);
+        }
+    }
 }

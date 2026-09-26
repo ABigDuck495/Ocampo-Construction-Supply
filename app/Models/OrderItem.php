@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+
 class OrderItem extends Model
 {
     public const STATUS_PENDING = 'Pending';
@@ -39,15 +40,7 @@ class OrderItem extends Model
     public function dispatches(){
         return $this->hasMany(Dispatch::class, 'OrderItemID', 'OrderItemID');
     }
-    // public function dispatches(){
-    //     return $this->hasMany(Dispatch::class, 'OrderItemID', 'OrderItemID');
-    // }
-    // public function deliveries(){
-    //     return $this->hasOneThrough(Delivery::class, Dispatch::class, 'OrderItemID', 'DispatchID', 'OrderItemID', 'DispatchID');
-    // }
-    // public function inventory(){
-    //     return $this->hasOne(Inventory::class, 'ProductID', 'ProductID');
-    // }
+
     public static function allowedStatuses(): array
     {
         return [self::STATUS_PENDING, self::STATUS_IN_PROGRESS, self::STATUS_COMPLETED];
@@ -78,15 +71,23 @@ class OrderItem extends Model
     public function scopeCompleted($query){
         return $query->where('Status', self::STATUS_COMPLETED);
     }
+
     public function subtotal() {
         $unit = $this->UnitPrice ?? $this->product?->UnitPrice;
         return (float) $this->Quantity * (float) ($unit ?? 0);
     }
+
+    /**
+     * Sum of QuantityDispatched across dispatches still "claiming" stock —
+     * i.e. everything except Failed/cancelled ones, since those release
+     * their quantity back into the pending pool.
+     */
     public function quantityDispatched() {
         return $this->relationLoaded('dispatches')
-            ? $this->dispatches->sum('QuantityDispatched')
-            : $this->dispatches()->sum('QuantityDispatched');
+            ? $this->dispatches->where('Status', '!=', 'Failed')->sum('QuantityDispatched')
+            : $this->dispatches()->where('Status', '!=', 'Failed')->sum('QuantityDispatched');
     }
+
     public function quantityRemaining() {
         return (float) $this->Quantity - $this->quantityDispatched();
     }

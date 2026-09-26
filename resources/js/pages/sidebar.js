@@ -29,8 +29,9 @@ function initThemeToggle(){
     const label = document.getElementById('themeLabel');
     if(!toggleBtn) return;
 
-    const saved = localStorage.getItem('theme'); // 'light' | 'dark' | null
+    const saved = localStorage.getItem('theme');
     if(saved === 'light') applyTheme(true);
+    document.documentElement.classList.remove('light-mode-pending');
 
     toggleBtn.addEventListener('click', () => {
         const isLight = document.body.classList.contains('light-mode');

@@ -9,6 +9,28 @@
 <script>
     window.DISPATCH_DATA = { orders: @json($orders), trucks: @json($trucks) };
 </script>
+
+<script>
+    (function() {
+        try {
+            if (localStorage.getItem('theme') === 'light') {
+                document.documentElement.classList.add('light-mode-pending');
+            }
+        } catch (e) {}
+    })();
+</script>
+
+<!-- SVG Size Fix -->
+<style>
+    /* Constrains the dynamically injected map pin SVGs inside the delivery board */
+    .board svg {
+        width: 16px;
+        height: 16px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+</style>
+
 @include('partials.system_settings_js')
 
 @vite(['resources/css/deliveries.css', 'resources/css/sidebar.css'])
@@ -94,21 +116,38 @@
     </div>
     <div class="hint">&middot; Drag orders onto trucks &middot;</div>
 
+    
+
     <div class="board">
         <div class="order-list" id="orderList"></div>
 
         <div class="fleet-panel">
+    <div class="ops-columns">
+        <div class="active-fleet-col">
             <div class="fleet-head">
-                <div class="fleet-title">TRUCK FLEET</div>
+                <div class="fleet-title">ACTIVE FLEET</div>
                 <div class="fleet-stats">
-                    <div class="fstat idle"><b id="fIdle">1</b><span>IDLE</span></div>
-                    <div class="fstat loading"><b id="fLoading">1</b><span>LOADING</span></div>
-                    <div class="fstat transit"><b id="fTransit">1</b><span>TRANSIT</span></div>
-                    <div class="fstat delivered"><b id="fDelivered">0</b><span>DELIVERED</span></div>
+                    <div class="fstat idle"><b id="fIdle"></b><span>IDLE</span></div>
+                    <div class="fstat loading"><b id="fLoading"></b><span>LOADING</span></div>
+                    <div class="fstat transit"><b id="fTransit"></b><span>TRANSIT</span></div>
+                    <div class="fstat delivered"><b id="fDelivered"></b><span>DELIVERED</span></div>
                 </div>
             </div>
             <div class="truck-grid" id="truckGrid"></div>
         </div>
+
+        <div class="dispatch-log-col">
+            <div class="fleet-head">
+                <div class="fleet-title">DISPATCH LOG</div>
+            </div>
+            <div class="log-tabs" id="logTabs">
+                <div class="log-tab active" data-logtab="deliveries">DELIVERIES</div>
+                <div class="log-tab" data-logtab="items">ITEMS</div>
+            </div>
+            <div class="log-list" id="logList"></div>
+        </div>
+    </div>
+</div>
     </div>
 </main>
 

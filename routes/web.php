@@ -87,6 +87,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('dispatch-drivers/swap', [DispatchDriverController::class, 'swap']);
         Route::get('dispatch-drivers/history/{driver}', [DispatchDriverController::class, 'history']);
         Route::get('deliveries/failed', [DeliveryController::class, 'failedDeliveries']);
+        Route::post('driver/deliveries/{dispatch}/accept', [DriverDeliveryController::class, 'accept']);
         Route::get('users/{user}/activity', [UserController::class, 'activity'])->name('users.activity');
         Route::put('inventories/{inventory}/update-with-product', [InventoryController::class, 'updateWithProduct'])->name('inventory.updateWithProduct');
     });

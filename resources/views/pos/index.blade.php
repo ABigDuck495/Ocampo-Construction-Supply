@@ -11,6 +11,15 @@
         products: @json($products),
     };
 </script>
+<script>
+    (function() {
+        try {
+            if (localStorage.getItem('theme') === 'light') {
+                document.documentElement.classList.add('light-mode-pending');
+            }
+        } catch (e) {}
+    })();
+</script>
 @include('partials.system_settings_js')
 <meta name="csrf-token" content="{{ csrf_token() }}">
 

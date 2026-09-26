@@ -125,9 +125,9 @@ $staffId = DB::table('users')
         // 4. Trucks
         // ----------------------------------------
         $trucks = [
-            ['TruckName' => 'Isuzu Elf',       'PlateNumber' => 'ABC-1234', 'Capacity' => 4.5, 'Status' => 'Available'],
-            ['TruckName' => 'Mitsubishi Fuso', 'PlateNumber' => 'XYZ-5678', 'Capacity' => 8.0, 'Status' => 'Available'],
-            ['TruckName' => 'Ford Transit',    'PlateNumber' => 'DEF-9012', 'Capacity' => 3.0, 'Status' => 'Unavailable'],
+            ['TruckName' => 'Isuzu Elf',       'PlateNumber' => 'ABC-1234', 'Capacity' => 30, 'Status' => 'Idle'],
+            ['TruckName' => 'Mitsubishi Fuso', 'PlateNumber' => 'XYZ-5678', 'Capacity' => 30, 'Status' => 'Idle'],
+            ['TruckName' => 'Ford Transit',    'PlateNumber' => 'DEF-9012', 'Capacity' => 30, 'Status' => 'Idle'],
         ];
         $truckIds = [];
         foreach ($trucks as $t) {
@@ -225,7 +225,9 @@ $staffId = DB::table('users')
                     'updated_at' => now(),
                 ]);
 
-                if ($faker->boolean(70)) {
+                $seedRandomDispatches = false;
+
+                if ($seedRandomDispatches && $faker->boolean(70)) {
                     $dispatchStatus = $faker->randomElement(['Pending', 'On Route', 'Delivered']);
                     $dispatchId = DB::table('dispatches')->insertGetId([
                         'OrderItemID'        => $orderItemId,
@@ -237,7 +239,7 @@ $staffId = DB::table('users')
                         'updated_at'         => now(),
                     ]);
 
-                    if ($faker->boolean(80)) {
+                    if ($seedRandomDispatches && $faker->boolean(80)) {
                         DB::table('deliveries')->insert([
                             'DispatchID'        => $dispatchId,
                             'DeliveryDate'      => $faker->dateTimeBetween('-1 week', 'now'),

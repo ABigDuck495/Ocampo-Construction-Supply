@@ -9,7 +9,7 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
 /* ---------------- DATA (from DispatchController@index) ----------------
    window.DISPATCH_DATA.orders  -> flat OrderItem[] still awaiting dispatch
-   window.DISPATCH_DATA.trucks  -> Truck[] with .dispatches (active ones with .orderItem.order, .drivers)
+   window.DISPATCH_DATA.trucks  -> Truck[] with .dispatches (Pending + On Route + past ones, with .orderItem.order/.product, .drivers)
    ------------------------------------------------------------------- */
 const rawOrderItems = (window.DISPATCH_DATA && window.DISPATCH_DATA.orders) || [];
 const rawTrucks = (window.DISPATCH_DATA && window.DISPATCH_DATA.trucks) || [];
@@ -20,14 +20,15 @@ function groupOrderItems(items) {
     const map = {};
     items.forEach(oi => {
         const oid = oi.OrderID;
-        if (!map[oid]) {
-            const order = oi.order || {};
-            // OrderType does not exist – default to 'Delivery'
-            const isPickup = false; // or derive from some flag if you add it later
-            map[oid] = {
+        const order = oi.order || {};
+        const customer = (order.CustomerName || 'Unknown').trim();
+        const groupKey = `${oid}_${customer.toLowerCase()}`;
+        if (!map[groupKey]) {
+            const isPickup = false;
+            map[groupKey] = {
                 id: 'ORD-' + oid,
                 orderId: oid,
-                customer: order.CustomerName || 'Unknown',
+                customer,
                 contact: order.ContactNumber || '',
                 address: order.Address || (isPickup ? 'Pickup at store' : ''),
                 notes: order.Notes || '',
@@ -38,39 +39,94 @@ function groupOrderItems(items) {
                 orderItemIds: [],
                 status: 'pending',
                 truck: null,
-                isSplitFrom: null, // set on a "sent" card carved off a pasabay order via applyPasabaySplit()
+                isSplitFrom: null,
             };
         }
         const product = oi.product || {};
-        map[oid].items.push({
+        map[groupKey].items.push({
             name: product.Product_Name || 'Item',
             qty: oi.Quantity,
             orderItemId: oi.OrderItemID,
         });
-        map[oid].orderItemIds.push(oi.OrderItemID);
+        map[groupKey].orderItemIds.push(oi.OrderItemID);
     });
     return Object.values(map);
 }
 
+/* ---------------- TRUCK MAPPING ----------------
+   Truck.Status (backend) drives everything:
+     Idle      -> no active work
+     Loading   -> dispatch(es) created, awaiting driver acceptance on their device
+     On Route  -> driver accepted, out for delivery
+     Maintenance -> out of service
+   activeDispatches holds every Pending/On Route dispatch on this truck,
+   sourced straight from the backend (not the local pre-dispatch `orders`
+   pool), since once a dispatch exists, its OrderItem drops out of the
+   unassigned-items query.
+
+   allDispatches holds EVERY dispatch (any status) for this truck, used to
+   power the global Dispatch Log panel (deliveries + items tabs).
+   ------------------------------------------------------------------- */
 function mapTrucks(list) {
     return list.map(t => {
-        const activeDispatches = (t.dispatches || []).filter(d => d.Status === 'On Route');
-        const mainDriver = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Driver');
-        const boardmate = activeDispatches[0]?.drivers?.find(d => d.pivot?.Role === 'Helper');
+        const relevantDispatches = (t.dispatches || []).filter(d => d.Status === 'On Route' || d.Status === 'Pending');
+        const onRouteDispatches = relevantDispatches.filter(d => d.Status === 'On Route');
+        const referenceDispatch = onRouteDispatches[0] || relevantDispatches[0];
+        const mainDriver = referenceDispatch?.drivers?.find(d => d.pivot?.Role === 'Driver');
+        const boardmate = referenceDispatch?.drivers?.find(d => d.pivot?.Role === 'Helper');
 
         let status = 'idle';
-        if (t.Status === 'On Route') status = 'transit';
+        if (t.Status === 'Loading') status = 'loading';
+        else if (t.Status === 'On Route') status = 'transit';
         else if (t.Status === 'Maintenance') status = 'maintenance';
+
+        const activeDispatches = relevantDispatches.map(d => {
+            const orderItem = d.orderItem || {};
+            const order = orderItem.order || {};
+            return {
+                dispatchId: d.DispatchID,
+                status: d.Status, // 'Pending' | 'On Route'
+                orderLabel: 'ORD-' + (orderItem.OrderID ?? order.OrderID ?? '—'),
+                customer: order.CustomerName || 'Unknown',
+                address: order.Address || '',
+                itemName: orderItem.product?.Product_Name || 'Item',
+                qty: Number(d.QuantityDispatched) || 0,
+                acceptedAt: d.AcceptedAt || null,
+            };
+        });
+
+        // Full dispatch history (any status) - powers the Dispatch Log panel
+        const allDispatches = (t.dispatches || []).map(d => {
+            const orderItem = d.orderItem || {};
+            const order = orderItem.order || {};
+            const mainD = d.drivers?.find(dr => dr.pivot?.Role === 'Driver');
+            const helperD = d.drivers?.find(dr => dr.pivot?.Role === 'Helper');
+            return {
+                dispatchId: d.DispatchID,
+                status: d.Status,
+                truckName: t.TruckName,
+                orderLabel: 'ORD-' + (orderItem.OrderID ?? order.OrderID ?? '—'),
+                customer: order.CustomerName || 'Unknown',
+                driver: mainD?.Name || '—',
+                helper: helperD?.Name || null,
+                itemName: orderItem.product?.Product_Name || 'Item',
+                qty: Number(d.QuantityDispatched) || 0,
+                timestamp: d.AcceptedAt || d.DispatchDate || d.created_at || null,
+            };
+        });
 
         return {
             id: t.TruckID,
             name: t.TruckName,
             driver: mainDriver?.Name || '—',
-            plate: t.PlateNumber,           // ← fixed field name
+            boardmate: boardmate?.Name || null,
+            plate: t.PlateNumber,
             capacity: Number(t.Capacity) || 0,
             status: status,
-            departed: activeDispatches[0]?.DispatchDate || null,
-            activeDispatchIds: activeDispatches.map(d => d.DispatchID),
+            departed: onRouteDispatches[0]?.AcceptedAt || null,
+            activeDispatchIds: onRouteDispatches.map(d => d.DispatchID),
+            activeDispatches: activeDispatches,
+            allDispatches: allDispatches,
         };
     });
 }
@@ -80,8 +136,12 @@ let trucks = mapTrucks(rawTrucks);
 
 let activeTab = 'all';
 let dragOrderId = null;
-let pasabaySplitCounter = 1; // used to build unique ids for "sent" cards carved off a pasabay order
+let pasabaySplitCounter = 1;
 const pendingDispatchDriversByTruck = new Map();
+
+/* ---------------- DISPATCH LOG STATE ---------------- */
+let dispatchLogEntries = [];
+let activeLogTab = 'deliveries';
 
 const svg = {
     pin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-7.2-7-12a7 7 0 0 1 14 0c0 4.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
@@ -93,18 +153,31 @@ const svg = {
     back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h11a4 4 0 0 1 0 8h-1"/></svg>',
     phone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
     note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>',
+    clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+    log:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
 };
 
 function fmt(n){ return '₱' + Number(n || 0).toFixed(2); }
+function fmtDateTime(iso){
+    if(!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+}
 function cargoOf(order){ return order.items.reduce((s,i)=>s + (parseFloat(i.qty) || 0), 0); }
 function truckCargo(truck){
     return orders.filter(o=>o.truck===truck.id).reduce((s,o)=>s+cargoOf(o),0);
+}
+function truckActiveCargo(truck){
+    return (truck.activeDispatches || []).reduce((s,d)=>s + (parseFloat(d.qty) || 0), 0);
 }
 
 function render(){
     renderStats();
     renderOrderList();
     renderTrucks();
+    dispatchLogEntries = buildDispatchLog();
+    renderDispatchLog();
 }
 
 function renderStats(){
@@ -126,7 +199,7 @@ function renderStats(){
     const sidebarBadge = document.getElementById('sidebarBadge');
     if (sidebarBadge) {
         sidebarBadge.textContent = pending + assigned + transit;
-}
+    }
 
     document.querySelector('.cnt-all').textContent = orders.length;
     document.querySelector('.cnt-pending').textContent = pending;
@@ -158,6 +231,11 @@ function badgeForOrderType(orderType){
     if(orderType !== 'Pickup') return '';
     return `<span class="badge pickup">PICKUP</span>`;
 }
+function statusBadgeForDispatch(status){
+    const map = { Pending:'pending', 'On Route':'transit', Delivered:'delivered', Failed:'returned', Cancelled:'returned' };
+    const cls = map[status] || '';
+    return `<span class="badge ${cls}">${(status || '').toUpperCase()}</span>`;
+}
 
 function renderOrderList(){
     const list = document.getElementById('orderList');
@@ -184,7 +262,7 @@ function renderOrderList(){
             ${o.notes ? `<div class="oc-notes">${svg.note}${o.notes}</div>` : ''}
             ${o.isSplitFrom ? `<div class="oc-pasabay-tag">PASABAY &middot; part of ${o.isSplitFrom}</div>` : ''}
             <div class="oc-items">
-                ${o.items.map(i=>`<div class="oc-item-row"><span>${i.name}</span><span class="qty">x${i.qty}</span></div>`).join('')}
+                ${o.items.map(i=>`<div class="oc-item-row"><span class="qty">${i.qty}×</span><span>${i.name}</span></div>`).join('')}
             </div>
             <div class="oc-bottom">
                 <div class="oc-price">${fmt(o.total)}</div>
@@ -210,37 +288,77 @@ function renderOrderList(){
 function renderTrucks(){
     const grid = document.getElementById('truckGrid');
     grid.innerHTML = trucks.map(truck=>{
-        const assignedOrders = orders.filter(o=>o.truck===truck.id && o.status!=='delivered' && o.status!=='returned');
-        const cargo = truckCargo(truck);
+        const localAssigned = orders.filter(o=>o.truck===truck.id && o.status!=='delivered' && o.status!=='returned');
+        const backendActive = truck.activeDispatches || [];
+        const isBuilding = truck.status === 'loading' && backendActive.length === 0 && localAssigned.length > 0;
+        const isAwaitingAcceptance = truck.status === 'loading' && backendActive.some(d => d.status === 'Pending');
+        const isOnRoute = truck.status === 'transit';
+
+        const cargo = isBuilding ? truckCargo(truck) : truckActiveCargo(truck);
         const segCount = 10;
         const filledSegs = truck.capacity ? Math.round((cargo/truck.capacity)*segCount) : 0;
 
         let statusBadgeClass = truck.status==='loading' ? 'pending' : truck.status==='transit' ? 'transit' : truck.status==='idle' ? '' : 'delivered';
-        let statusLabel = truck.status.toUpperCase();
+        let statusLabel = isAwaitingAcceptance ? 'AWAITING DRIVER' : truck.status.toUpperCase();
 
-        const ordersHtml = assignedOrders.map(o => `
-            <div class="tc-order-row">
-                <span>${o.id} &middot; ${o.customer}</span>
-                ${truck.status==='loading' ? `<button class="tc-unassign" onclick="unassign('${o.id}')" title="Unassign">${svg.x}</button>` : ''}
-            </div>`).join('');
-
+        let ordersHtml = '';
         let actionsHtml = '';
-        if(truck.status==='loading'){
+
+        if (isBuilding) {
+            // Pre-dispatch: items staged locally, nothing sent to the backend yet.
+            ordersHtml = localAssigned.map(o => `
+                <div class="tc-order-row">
+                    <span>${o.id} &middot; ${o.customer}</span>
+                    <button class="tc-unassign" onclick="unassign('${o.id}')" title="Unassign">${svg.x}</button>
+                </div>`).join('');
+
             actionsHtml = `
                 <div class="tc-actions">
                     <button class="btn btn-dispatch" onclick="dispatchTruck('${truck.id}')">${svg.arrow} DISPATCH</button>
                     <button class="btn-ghost" onclick="clearTruck('${truck.id}')">CLEAR</button>
                 </div>`;
-        } else if(truck.status==='transit'){
+        } else if (isAwaitingAcceptance) {
+            const groups = groupDispatchesByOrder(backendActive);
+            ordersHtml = groups.map(g => `
+                <div class="tc-order-group">
+                    <div class="tc-order-group-head">${g.orderLabel} &middot; ${g.customer}</div>
+                    ${g.items.map(d => `
+                        <div class="tc-order-item-line" style="justify-content:space-between;">
+                            <span><span class="qty">${d.qty}&times;</span> ${d.itemName}</span>
+                            <button class="tc-unassign" onclick="cancelPendingDispatch(${d.dispatchId})" title="Cancel">${svg.x}</button>
+                        </div>`).join('')}
+                </div>
+            `).join('');
+
+            actionsHtml = `
+                <div class="tc-awaiting-note">${svg.clock} Waiting for driver to accept on their device&hellip;</div>
+                <div class="tc-actions">
+                    <button class="btn-ghost" onclick="viewDispatchLog('${truck.id}')">${svg.log} LOG</button>
+                </div>`;
+        } else if (isOnRoute) {
+            const groups = groupDispatchesByOrder(backendActive);
+            ordersHtml = groups.map(g => `
+                <div class="tc-order-group">
+                    <div class="tc-order-group-head">${g.orderLabel} &middot; ${g.customer}</div>
+                    ${g.items.map(d => `
+                        <div class="tc-order-item-line"><span class="qty">${d.qty}&times;</span><span>${d.itemName}</span></div>
+                    `).join('')}
+                    <div class="tc-order-addr">${svg.pin}${g.address || '—'}</div>
+                </div>
+            `).join('');
+
             actionsHtml = `
                 <div class="tc-actions">
-                    <button class="btn btn-delivered" onclick="markDelivered('${truck.id}')">${svg.check} SUCCESSFUL</button>
+                    <button class="btn btn-delivered" onclick="openDeliveryConfirmModal('${truck.id}')">${svg.check} SUCCESSFUL</button>
                     <button class="btn btn-return" onclick="markReturned('${truck.id}')" title="Dispatch failed">${svg.back} FAILED</button>
                 </div>
-                <div class="tc-departed">DEPARTED: ${truck.departed || ''}</div>`;
+                <div class="tc-actions">
+                    <button class="btn-ghost" onclick="viewDispatchLog('${truck.id}')" style="flex:1;">${svg.log} LOG</button>
+                </div>
+                <div class="tc-departed">${svg.clock} ACCEPTED: ${fmtDateTime(truck.departed)}</div>`;
         }
 
-        const isLocked = truck.status === 'transit';
+        const isLocked = isOnRoute;
 
         return `
         <div class="truck-card ${isLocked ? 'is-full' : ''}" data-truck="${truck.id}">
@@ -256,7 +374,7 @@ function renderTrucks(){
                     ${Array.from({length:segCount}).map((_,i)=>`<div class="cargo-seg ${i<filledSegs?'filled':''}"></div>`).join('')}
                 </div>
             </div>
-            <div class="tc-orders">${ordersHtml}</div>
+            <div class="tc-orders">${ordersHtml || '<div class="dropzone-empty">No active items</div>'}</div>
             ${actionsHtml}
         </div>`;
     }).join('');
@@ -264,8 +382,8 @@ function renderTrucks(){
     grid.querySelectorAll('.truck-card').forEach(card=>{
         const truckId = card.dataset.truck;
         const truck = trucks.find(t=>String(t.id)===String(truckId));
-        if(truck.status === 'transit') return;
         if(truck.status !== 'loading' && truck.status !== 'idle') return;
+        if((truck.activeDispatches || []).length > 0) return; // already dispatched, not a drop target
 
         card.addEventListener('dragover', e=>{
             e.preventDefault();
@@ -275,13 +393,71 @@ function renderTrucks(){
         card.addEventListener('drop', e=>{
             e.preventDefault();
             card.classList.remove('drop-active');
-            if(dragOrderId && truck.status !== 'transit') openAssignModal(dragOrderId, truckId);
+            if(dragOrderId) openAssignModal(dragOrderId, truckId);
             dragOrderId = null;
         });
     });
 }
 
-/* ---------------- MODAL STYLES (shared by the assign + driver-picker modals) ---------------- */
+/* ---------------- DISPATCH LOG (right column) ---------------- */
+
+function buildDispatchLog(){
+    const entries = [];
+    trucks.forEach(t => entries.push(...(t.allDispatches || [])));
+    entries.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+    return entries;
+}
+
+function groupDispatchesByOrder(dispatches) {
+    const map = new Map();
+    dispatches.forEach(d => {
+        const key = `${d.orderLabel}_${d.customer}`;
+        if (!map.has(key)) {
+            map.set(key, {
+                orderLabel: d.orderLabel,
+                customer: d.customer,
+                address: d.address || '',
+                items: [],
+            });
+        }
+        map.get(key).items.push(d);
+    });
+    return Array.from(map.values());
+}
+
+function renderDispatchLog(){
+    const list = document.getElementById('logList');
+    if(!list) return;
+
+    if(!dispatchLogEntries.length){
+        list.innerHTML = `<div class="empty-state">NO DISPATCH ACTIVITY YET</div>`;
+        return;
+    }
+
+    if(activeLogTab === 'deliveries'){
+        list.innerHTML = dispatchLogEntries.map(e => `
+            <div class="log-row">
+                <div class="log-row-top">
+                    <span class="log-order">${e.orderLabel} &middot; ${e.customer}</span>
+                    ${statusBadgeForDispatch(e.status)}
+                </div>
+                <div class="log-row-sub">${svg.truck} ${e.truckName} &middot; ${e.driver}${e.helper ? ' + ' + e.helper : ''}</div>
+                <div class="log-row-time">${svg.clock} ${fmtDateTime(e.timestamp)}</div>
+            </div>`).join('');
+    } else {
+        list.innerHTML = dispatchLogEntries.map(e => `
+            <div class="log-row">
+                <div class="log-row-top">
+                    <span class="log-order">${e.itemName}</span>
+                    <span class="log-qty">x${e.qty}</span>
+                </div>
+                <div class="log-row-sub">${e.orderLabel} &middot; ${e.customer} &middot; ${e.truckName}</div>
+                <div class="log-row-time">${svg.clock} ${fmtDateTime(e.timestamp)}</div>
+            </div>`).join('');
+    }
+}
+
+/* ---------------- MODAL STYLES (shared by all modals) ---------------- */
 
 let modalStylesInjected = false;
 function injectAssignModalStyles(){
@@ -308,6 +484,8 @@ function injectAssignModalStyles(){
         .doa-optional{opacity:.55;font-weight:500;text-transform:none;letter-spacing:0;}
         .doa-select{width:100%;background:#fff;color:#171310;border:2px solid #171310;border-radius:6px;padding:7px 9px;font-family:inherit;font-weight:600;margin-bottom:4px;}
         .doa-select:focus{outline:none;border-color:#e0592a;}
+        .doa-textarea{width:100%;background:#fff;color:#171310;border:2px solid #171310;border-radius:6px;padding:8px 9px;font-family:inherit;font-weight:500;resize:vertical;min-height:60px;}
+        .doa-textarea:focus{outline:none;border-color:#e0592a;}
         .doa-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
         .doa-receipt-box{background:#fffaf0;color:#171310;width:320px;max-width:100%;max-height:85vh;overflow-y:auto;padding:20px 22px 22px;position:relative;border:3px solid #171310;border-radius:10px;box-shadow:6px 6px 0 #171310;}
         .doa-receipt-header{text-align:center;margin:6px 0 4px;}
@@ -325,15 +503,19 @@ function injectAssignModalStyles(){
         .doa-receipt-close{width:100%;margin-top:16px;}
         .doa-receipt-actions{display:flex;gap:8px;margin-top:16px;}
         .doa-receipt-actions .doa-receipt-close{margin-top:0;}
+        .doa-log-row{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #ece4d4;font-size:11.5px;}
+        .doa-log-row:last-child{border-bottom:none;}
+        .doa-log-action{font-weight:800;min-width:110px;}
+        .doa-log-time{color:#93897c;font-size:10px;white-space:nowrap;}
+        .doa-log-notes{color:#6b6258;flex:1;}
+        .doa-log-group-title{font-weight:800;font-size:11px;letter-spacing:.4px;margin:14px 0 4px;color:#e0592a;}
+        .doa-log-group-title:first-child{margin-top:0;}
     `;
     document.head.appendChild(style);
 }
 
-/* ---------------- PASABAY: partial-item assignment ---------------- */
+/* ---------------- PASABAY: partial-item assignment (pre-dispatch) ---------------- */
 
-// Opens a per-item quantity picker before an order actually lands on a truck.
-// Whatever isn't sent now stays on the original card as still-pending stock,
-// ready to go out on the next delivery run.
 async function openAssignModal(orderId, truckId){
     const order = orders.find(o=>o.id===orderId);
     const truck = trucks.find(t=>String(t.id)===String(truckId));
@@ -349,10 +531,6 @@ async function openAssignModal(orderId, truckId){
             <input type="number" class="doa-qty-input" data-idx="${idx}" min="0" max="${item.qty}" value="${item.qty}" step="1">
         </div>
     `).join('');
-
-    const driverOptions = drivers.length
-        ? drivers.map(d => `<option value="${d.DriverID}">${d.Name}</option>`).join('')
-        : '<option value="">No drivers available</option>';
 
     const mainDriverSelect = (selectedId = '') => `
         <option value="">Select driver</option>
@@ -450,8 +628,6 @@ async function openAssignModal(orderId, truckId){
     });
 }
 
-// Splits an order's items between "sent now" and "kept for next time" based on
-// the quantities chosen in openAssignModal(), per the pasabay concept.
 function applyPasabaySplit(order, truck, chosen){
     const sentItems = [];
     const keptItems = [];
@@ -467,13 +643,10 @@ function applyPasabaySplit(order, truck, chosen){
     const fullySent = keptItems.length === 0;
 
     if(fullySent){
-        // Nothing held back - behaves like a normal, non-pasabay assignment.
         order.items = sentItems;
         order.truck = truck.id;
         order.status = 'assigned';
     } else {
-        // Carve off a new card for the sent portion; the original card stays
-        // pending with only the leftover quantities (pasabay for next time).
         const sentOrder = {
             ...order,
             id: order.id + '-P' + (pasabaySplitCounter++),
@@ -496,9 +669,6 @@ function applyPasabaySplit(order, truck, chosen){
 
 /* ---------------- ACTIONS ---------------- */
 
-// Rolls an assigned card's items back into pending. If it was a pasabay "sent"
-// card, its items are merged back into the original leftover card instead of
-// leaving a stray duplicate on the board.
 function mergeItemsBackToPending(order){
     const parentId = order.isSplitFrom || order.id;
     const parent = orders.find(o => o.id === parentId && o !== order);
@@ -522,7 +692,7 @@ function unassign(orderId){
     if(!order) return;
     mergeItemsBackToPending(order);
     trucks.forEach(t=>{
-        if(t.status==='loading' && truckCargo(t)===0) t.status = 'idle';
+        if(t.status==='loading' && truckCargo(t)===0 && (t.activeDispatches||[]).length===0) t.status = 'idle';
     });
     render();
 }
@@ -534,9 +704,32 @@ function clearTruck(truckId){
     render();
 }
 
-// Drivers have no "role" column - Main vs Assistant is a property of the
-// dispatch assignment itself, not the person - so both the driver and
-// boardmate pickers draw from the same available-drivers list.
+/**
+ * Cancels a dispatch that's still awaiting the driver's acceptance
+ * (backend status 'Pending'). Releases the item back to the unassigned pool.
+ */
+async function cancelPendingDispatch(dispatchId){
+    if(!confirm('Cancel this dispatch? The item will return to the pending pool.')) return;
+    try {
+        const res = await fetch(`/dispatches/${dispatchId}/cancel`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+            },
+        });
+        if(!res.ok){
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || 'Failed to cancel dispatch.');
+        }
+        window.location.reload();
+    } catch (err) {
+        console.error('Cancel dispatch failed:', err);
+        alert(err.message || 'Something went wrong cancelling the dispatch.');
+    }
+}
+
 async function fetchAvailableDrivers(){
     try {
         const res = await fetch('/drivers/available');
@@ -548,8 +741,6 @@ async function fetchAvailableDrivers(){
     }
 }
 
-// Lets the dispatcher pick a driver (required) and a boardmate (optional)
-// before the truck leaves. Resolves { driverId, boardmateId } or null if cancelled.
 function openDriverPickerModal(){
     return new Promise(async (resolve) => {
         const drivers = await fetchAvailableDrivers();
@@ -591,7 +782,6 @@ function openDriverPickerModal(){
         const driverSelect = overlay.querySelector('#dpDriver');
         const boardmateSelect = overlay.querySelector('#dpBoardmate');
 
-        // Keep the boardmate list from ever including whoever is picked as the main driver.
         function refreshBoardmateOptions(){
             const chosenBoardmate = boardmateSelect.value;
             boardmateSelect.innerHTML = `<option value="">— none —</option>${optionsFor(driverSelect.value)}`;
@@ -611,8 +801,11 @@ function openDriverPickerModal(){
     });
 }
 
-// Real dispatch - creates one Dispatch record per OrderItem assigned to this truck,
-// after the dispatcher confirms a driver (and optional boardmate) in the picker.
+/**
+ * Creates the dispatch(es) for a truck's staged items. Backend creates them
+ * as 'Pending' and moves the truck to 'Loading' — the driver still needs
+ * to accept on their own device before it becomes 'On Route'.
+ */
 async function dispatchTruck(truckId, presetDrivers = null){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
     const assigned = orders.filter(o=>String(o.truck)===String(truckId));
@@ -652,7 +845,6 @@ async function dispatchTruck(truckId, presetDrivers = null){
             }
         }
 
-        // Reload to get fresh truth from the server (real Dispatch/Truck statuses).
         window.location.reload();
     } catch (err) {
         console.error('Dispatch failed:', err);
@@ -660,41 +852,98 @@ async function dispatchTruck(truckId, presetDrivers = null){
     }
 }
 
-// Confirms delivery for every active Dispatch currently on this truck.
-async function markDelivered(truckId){
+/**
+ * Opens the delivery confirmation modal for a truck that's On Route,
+ * letting the dispatcher set the actual delivered quantity per item.
+ * Anything short of the dispatched quantity (pasabay) is automatically
+ * returned to the pending pool by the backend.
+ */
+function openDeliveryConfirmModal(truckId){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
-    if(!truck || !truck.activeDispatchIds.length) return;
+    if(!truck) return;
+    const items = (truck.activeDispatches || []).filter(d => d.status === 'On Route');
+    if(!items.length) return;
 
-    try {
-        for (const dispatchId of truck.activeDispatchIds) {
-            const res = await fetch(`/dispatches/${dispatchId}/deliveries`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({
-                    QuantityDelivered: 0, // backend uses the dispatched quantity; adjust here if partials matter
-                    Status: 'Delivered',
-                }),
-            });
-            if(!res.ok){
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Failed to confirm delivery.');
+    const rows = items.map((d, idx) => `
+        <div class="doa-item-row">
+            <span class="doa-item-name">${d.orderLabel} &middot; ${d.itemName}</span>
+            <span class="doa-item-avail">of ${d.qty}</span>
+            <input type="number" class="doa-qty-input" data-dispatch-id="${d.dispatchId}" data-max="${d.qty}" min="0" max="${d.qty}" value="${d.qty}" step="1">
+        </div>
+    `).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'doa-modal-overlay';
+    overlay.innerHTML = `
+        <div class="doa-modal-box">
+            <div class="doa-modal-head">
+                <div>CONFIRM DELIVERY &middot; ${truck.name.toUpperCase()}</div>
+                <button class="doa-modal-x" id="dcCancel">${svg.x}</button>
+            </div>
+            <div class="doa-modal-sub">Enter what was actually delivered for each item. Anything less than the full amount stays pending for the next run (pasabay).</div>
+            <div class="doa-item-list">${rows}</div>
+            <label class="doa-field-label">NOTES <span class="doa-optional">(optional)</span></label>
+            <textarea class="doa-textarea" id="dcNotes" placeholder="e.g. customer not home for 2 bags of cement"></textarea>
+            <div class="doa-modal-actions">
+                <button class="btn-ghost" id="dcCancelBtn">CANCEL</button>
+                <button class="btn btn-delivered" id="dcConfirmBtn">${svg.check} CONFIRM DELIVERY</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    injectAssignModalStyles();
+
+    function close(){ overlay.remove(); }
+    overlay.querySelector('#dcCancel').addEventListener('click', close);
+    overlay.querySelector('#dcCancelBtn').addEventListener('click', close);
+    overlay.querySelector('#dcConfirmBtn').addEventListener('click', async () => {
+        const notes = overlay.querySelector('#dcNotes').value.trim();
+        const entries = Array.from(overlay.querySelectorAll('.doa-qty-input')).map(inp => ({
+            dispatchId: inp.dataset.dispatchId,
+            qty: Math.max(0, Math.min(parseFloat(inp.value) || 0, Number(inp.dataset.max))),
+        }));
+
+        const confirmBtn = overlay.querySelector('#dcConfirmBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'SAVING…';
+
+        try {
+            for (const entry of entries) {
+                const res = await fetch(`/dispatches/${entry.dispatchId}/deliveries`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        QuantityDelivered: entry.qty,
+                        Status: 'Delivered',
+                        Notes: notes || null,
+                    }),
+                });
+                if(!res.ok){
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.message || 'Failed to confirm delivery.');
+                }
             }
+            window.location.reload();
+        } catch (err) {
+            console.error('Confirm delivery failed:', err);
+            alert(err.message || 'Something went wrong confirming delivery.');
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'CONFIRM DELIVERY';
         }
-        window.location.reload();
-    } catch (err) {
-        console.error('Mark delivered failed:', err);
-        alert(err.message || 'Something went wrong confirming delivery.');
-    }
+    });
 }
 
-// Confirms a failed/returned delivery for every active Dispatch on this truck.
+/**
+ * Marks every active dispatch on a truck as Failed (nothing delivered).
+ * All items return to the pending pool for re-delivery.
+ */
 async function markReturned(truckId){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
     if(!truck || !truck.activeDispatchIds.length) return;
+    if(!confirm(`Mark ${truck.name}'s delivery as failed? All items will return to the pending pool.`)) return;
 
     try {
         for (const dispatchId of truck.activeDispatchIds) {
@@ -722,12 +971,56 @@ async function markReturned(truckId){
     }
 }
 
+/**
+ * Shows the full dispatch log (Dispatched -> Accepted -> Delivered/Failed
+ * etc.) for every active dispatch on a truck.
+ */
+async function viewDispatchLog(truckId){
+    const truck = trucks.find(t=>String(t.id)===String(truckId));
+    if(!truck) return;
+    const ids = (truck.activeDispatches || []).map(d => d.dispatchId);
+    if(!ids.length) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'doa-modal-overlay';
+    overlay.innerHTML = `
+        <div class="doa-modal-box">
+            <div class="doa-modal-head">
+                <div>DISPATCH LOG &middot; ${truck.name.toUpperCase()}</div>
+                <button class="doa-modal-x" id="dlClose">${svg.x}</button>
+            </div>
+            <div id="dlBody" class="doa-modal-sub">Loading&hellip;</div>
+        </div>`;
+    document.body.appendChild(overlay);
+    injectAssignModalStyles();
+    overlay.querySelector('#dlClose').addEventListener('click', () => overlay.remove());
+
+    try {
+        const results = await Promise.all(ids.map(id =>
+            fetch(`/dispatches/${id}`, { headers: { 'Accept': 'application/json' } }).then(r => r.json())
+        ));
+
+        const body = overlay.querySelector('#dlBody');
+        body.innerHTML = results.map(d => {
+            const label = `${d.orderItem?.product?.Product_Name || 'Item'} &middot; Dispatch #${d.DispatchID}`;
+            const logs = (d.logs || []).map(l => `
+                <div class="doa-log-row">
+                    <span class="doa-log-action">${l.Action}</span>
+                    <span class="doa-log-notes">${l.Notes || ''}</span>
+                    <span class="doa-log-time">${fmtDateTime(l.LoggedAt)}</span>
+                </div>
+            `).join('') || '<div class="doa-log-row"><span class="doa-log-notes">No log entries yet.</span></div>';
+
+            return `<div class="doa-log-group-title">${label}</div>${logs}`;
+        }).join('');
+    } catch (err) {
+        console.error('Failed to load dispatch log:', err);
+        overlay.querySelector('#dlBody').textContent = 'Could not load the dispatch log.';
+    }
+}
+
 /* ----------------------------------------------------------
-   Builds the payload printReceipt() sends to the printer for a
-   Delivery Ops order. Deliberately leaves out price/total — this
-   page never had pricing data to begin with (order.total is always
-   0 here), so the printed receipt matches what's actually shown in
-   the on-screen RECEIPT modal: items + qty, no dollar amounts.
+   Receipt printing
    ---------------------------------------------------------- */
 function buildDeliveryPrintPayload(order){
     const addressLine = order.orderType === 'Pickup' ? 'Pickup at store' : (order.address || '');
@@ -742,7 +1035,7 @@ function buildDeliveryPrintPayload(order){
         address: addressLine || null,
         notes: order.notes || null,
         payment_status: order.paymentStatus || null,
-        items: order.items.map(i => ({ name: i.name, qty: i.qty })), // no price — not tracked on this page
+        items: order.items.map(i => ({ name: i.name, qty: i.qty })),
         total: null,
         footer: 'Thank you for your business!',
     };
@@ -828,6 +1121,19 @@ document.getElementById('tabs').addEventListener('click', e=>{
     renderOrderList();
 });
 
+/* ---------------- DISPATCH LOG TABS ---------------- */
+const logTabsEl = document.getElementById('logTabs');
+if (logTabsEl) {
+    logTabsEl.addEventListener('click', e=>{
+        const tab = e.target.closest('.log-tab');
+        if(!tab) return;
+        activeLogTab = tab.dataset.logtab;
+        document.querySelectorAll('.log-tab').forEach(t=>t.classList.remove('active'));
+        tab.classList.add('active');
+        renderDispatchLog();
+    });
+}
+
 render();
 
 /* ---------------- EXPOSE TO GLOBAL SCOPE ---------------- */
@@ -835,5 +1141,7 @@ window.viewReceipt = viewReceipt;
 window.unassign = unassign;
 window.clearTruck = clearTruck;
 window.dispatchTruck = dispatchTruck;
-window.markDelivered = markDelivered;
+window.cancelPendingDispatch = cancelPendingDispatch;
+window.openDeliveryConfirmModal = openDeliveryConfirmModal;
 window.markReturned = markReturned;
+window.viewDispatchLog = viewDispatchLog;

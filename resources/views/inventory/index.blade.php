@@ -2,6 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+     <script>
+        (function() {
+            try {
+                if (localStorage.getItem('theme') === 'light') {
+                    document.documentElement.classList.add('light-mode-pending');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Inventory - Ocampo Construction and Hardware Supplies</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +24,7 @@
             outOfStockCount: {{ $outOfStockCount }}
         };
     </script>
+   
 
     @include('partials.system_settings_js')
 

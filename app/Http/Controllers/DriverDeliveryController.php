@@ -67,7 +67,7 @@ class DriverDeliveryController extends Controller
      *
      * POST /api/driver/deliveries/{dispatch}/accept
      */
-    public function accept(Request $request, Dispatch $dispatch)
+        public function accept(Request $request, Dispatch $dispatch)
     {
         $driverId = $request->user()->DriverID;
 
@@ -87,9 +87,22 @@ class DriverDeliveryController extends Controller
             ], 409);
         }
 
-        $dispatch->update(['Status' => 'On Route']);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($dispatch) {
+            $dispatch->update([
+                'Status' => 'On Route',
+                'AcceptedAt' => now(),
+            ]);
+            $dispatch->truck()->update(['Status' => 'On Route']);
 
-        return response()->json(['message' => 'Delivery accepted.']);
+            \App\Models\DispatchLog::create([
+                'DispatchID' => $dispatch->DispatchID,
+                'Action' => 'Accepted',
+                'Notes' => 'Driver accepted and departed.',
+                'LoggedAt' => now(),
+            ]);
+
+            return response()->json(['message' => 'Delivery accepted.']);
+        });
     }
 
     /**

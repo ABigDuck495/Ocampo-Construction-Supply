@@ -7,6 +7,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
 
+    <script>
+    (function() {
+        try {
+            if (localStorage.getItem('theme') === 'light') {
+                document.documentElement.classList.add('light-mode-pending');
+            }
+        } catch (e) {}
+    })();
+    </script>
+
     <!-- Shared stylesheets (same design system as POS / Delivery Ops) -->
     @vite(['resources/css/deliveries.css', 'resources/css/sidebar.css', 'resources/css/reports.css'])
     @include('partials.system_settings_js')

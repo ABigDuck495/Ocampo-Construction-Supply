@@ -137,7 +137,9 @@ body {
    Toggled by adding class="light-mode" to <body> via sidebar.js.
    Overriding the custom properties here cascades to the whole
    page (sidebar + main content) since both read the same vars. */
-body.light-mode{
+/* was: body.light-mode { ... } */
+body.light-mode,
+html.light-mode-pending body {
     --bg:#f4f2ec;
     --panel:#ffffff;
     --panel-alt:#eeece3;
@@ -147,5 +149,16 @@ body.light-mode{
     --text-dim:#5a5f6b;
     --text-faint:#8a8f9c;
 }
+/* was: */
 body.light-mode .sidebar{background:#fff;}
 body.light-mode .brand-icon svg{color:#1a1305;}
+
+/* now: */
+body.light-mode .sidebar,
+html.light-mode-pending body .sidebar{
+    background:#fff;
+}
+body.light-mode .brand-icon svg,
+html.light-mode-pending body .brand-icon svg{
+    color:#1a1305;
+}
