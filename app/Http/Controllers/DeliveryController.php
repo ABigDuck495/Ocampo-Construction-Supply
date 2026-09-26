@@ -86,7 +86,7 @@ class DeliveryController extends Controller
             if ($settings->isEnabled('enable_Inventory_tracking')) {
                 // If tracking enabled, deduct stock unless setting forbids
                 try {
-                    $product->inventory?->deduct($validated['QuantityDelivered']);
+                    $product->inventory?->deductQuantity($validated['QuantityDelivered']);
                 } catch (\Exception $e) {
                     if ($settings->isEnabled('allow_unresolved_price_checkout')) {
                         // swallow and continue if allowed by settings

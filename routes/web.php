@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DispatchController;
 use App\Http\Controllers\DispatchDriverController;
+use App\Http\Controllers\DriverDeliveryController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;

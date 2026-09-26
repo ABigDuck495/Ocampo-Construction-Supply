@@ -76,8 +76,9 @@ function mapTrucks(list) {
         const boardmate = referenceDispatch?.drivers?.find(d => d.pivot?.Role === 'Helper');
 
         let status = 'idle';
-        if (t.Status === 'Loading') status = 'loading';
-        else if (t.Status === 'On Route') status = 'transit';
+        if (onRouteDispatches.length > 0) status = 'transit';
+        else if (relevantDispatches.some(d => d.Status === 'Pending')) status = 'loading';
+        else if (t.Status === 'Loading') status = 'loading';
         else if (t.Status === 'Maintenance') status = 'maintenance';
 
         const activeDispatches = relevantDispatches.map(d => {
@@ -351,10 +352,7 @@ function renderTrucks(){
                 <div class="tc-actions">
                     <button class="btn btn-delivered" onclick="openDeliveryConfirmModal('${truck.id}')">${svg.check} SUCCESSFUL</button>
                     <button class="btn btn-return" onclick="markReturned('${truck.id}')" title="Dispatch failed">${svg.back} FAILED</button>
-                </div>
-                <div class="tc-actions">
-                    <button class="btn-ghost" onclick="viewDispatchLog('${truck.id}')" style="flex:1;">${svg.log} LOG</button>
-                </div>
+                </div> 
                 <div class="tc-departed">${svg.clock} ACCEPTED: ${fmtDateTime(truck.departed)}</div>`;
         }
 
@@ -861,8 +859,11 @@ async function dispatchTruck(truckId, presetDrivers = null){
 function openDeliveryConfirmModal(truckId){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
     if(!truck) return;
-    const items = (truck.activeDispatches || []).filter(d => d.status === 'On Route');
-    if(!items.length) return;
+    const items = (truck.activeDispatches || []).filter(d => d.status !== 'Delivered' && d.status !== 'Failed');
+    if(!items.length){
+        alert('This truck has no accepted deliveries yet. The driver must accept the dispatch first.');
+        return;
+    }
 
     const rows = items.map((d, idx) => `
         <div class="doa-item-row">
@@ -942,7 +943,11 @@ function openDeliveryConfirmModal(truckId){
  */
 async function markReturned(truckId){
     const truck = trucks.find(t=>String(t.id)===String(truckId));
-    if(!truck || !truck.activeDispatchIds.length) return;
+    if(!truck) return;
+    if(!truck.activeDispatchIds.length){
+        alert('This truck has no accepted deliveries to mark as failed.');
+        return;
+    }
     if(!confirm(`Mark ${truck.name}'s delivery as failed? All items will return to the pending pool.`)) return;
 
     try {
