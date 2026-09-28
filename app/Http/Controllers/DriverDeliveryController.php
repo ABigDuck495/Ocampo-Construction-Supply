@@ -3,18 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Models\Dispatch;
+use App\Models\DispatchLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Driver-app endpoints. Kept separate from DeliveryController (staff CRUD
  * over the `deliveries` table) and DispatchController (staff dispatch
  * creation/management) to avoid clashing with either.
+ *
+ * NOTE ON GROUPING: staff create one dispatch per order item, so a single
+ * order with 4 products on one truck becomes 4 dispatch rows. The driver
+ * should see that as ONE delivery. Dispatches that share the same order,
+ * truck and status (and are assigned to this driver) are treated as one
+ * "truckload" group: the list shows one card per group, and accept/deliver
+ * act on every dispatch in the group together. The app keeps using the
+ * first dispatch's ID as the group's identifier, so no Flutter changes
+ * are needed.
  */
 class DriverDeliveryController extends Controller
 {
     /**
-     * Dispatches assigned to the logged-in driver that are still open
-     * (awaiting acceptance, or already accepted and on route).
+     * Open deliveries for the logged-in driver (awaiting acceptance, or
+     * accepted and on route), one entry per order/truck group.
      *
      * GET /api/driver/deliveries
      */
@@ -33,15 +44,19 @@ class DriverDeliveryController extends Controller
             ->whereIn('Status', ['Pending', 'On Route'])
             ->orderByRaw("FIELD(Status, 'On Route', 'Pending')")
             ->orderBy('DispatchDate')
+            ->orderBy('DispatchID')
             ->get();
 
-        return response()->json([
-            'deliveries' => $dispatches->map(fn ($d) => $this->formatDispatch($d, $driverId)),
-        ]);
+        $deliveries = $dispatches
+            ->groupBy(fn ($d) => ($d->orderItem?->OrderID ?? 'x') . '|' . $d->TruckID . '|' . $d->Status)
+            ->map(fn ($group) => $this->formatDispatch($group->first(), $driverId, $group))
+            ->values();
+
+        return response()->json(['deliveries' => $deliveries]);
     }
 
     /**
-     * Full detail for one assigned dispatch.
+     * Full detail for one assigned delivery (group).
      *
      * GET /api/driver/deliveries/{dispatch}
      */
@@ -53,21 +68,20 @@ class DriverDeliveryController extends Controller
             return response()->json(['message' => 'This delivery is not assigned to you.'], 403);
         }
 
-        $dispatch->load(['orderItem.order', 'orderItem.product', 'truck', 'drivers']);
+        $group = $this->groupFor($dispatch, $driverId);
 
         return response()->json([
-            'delivery' => $this->formatDispatch($dispatch, $driverId),
+            'delivery' => $this->formatDispatch($group->first() ?? $dispatch, $driverId, $group),
         ]);
     }
 
     /**
      * Driver accepts a pending delivery assigned to them.
-     * Dispatch: 'Pending' -> 'On Route'. Truck was already 'Unavailable'
-     * since the dispatch was created, so it doesn't need to change here.
+     * Every dispatch in the group: 'Pending' -> 'On Route'.
      *
      * POST /api/driver/deliveries/{dispatch}/accept
      */
-        public function accept(Request $request, Dispatch $dispatch)
+    public function accept(Request $request, Dispatch $dispatch)
     {
         $driverId = $request->user()->DriverID;
 
@@ -87,29 +101,101 @@ class DriverDeliveryController extends Controller
             ], 409);
         }
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($dispatch) {
-            $dispatch->update([
-                'Status' => 'On Route',
-                'AcceptedAt' => now(),
-            ]);
-            $dispatch->truck()->update(['Status' => 'On Route']);
+        $group = $this->groupFor($dispatch, $driverId);
 
-            \App\Models\DispatchLog::create([
-                'DispatchID' => $dispatch->DispatchID,
-                'Action' => 'Accepted',
-                'Notes' => 'Driver accepted and departed.',
-                'LoggedAt' => now(),
-            ]);
+        return DB::transaction(function () use ($group, $dispatch) {
+            foreach ($group as $d) {
+                $d->update([
+                    'Status' => 'On Route',
+                    'AcceptedAt' => now(),
+                ]);
+
+                DispatchLog::create([
+                    'DispatchID' => $d->DispatchID,
+                    'Action' => 'Accepted',
+                    'Notes' => 'Driver accepted and departed.',
+                    'LoggedAt' => now(),
+                ]);
+            }
+
+            $dispatch->truck()->update(['Status' => 'On Route']);
 
             return response()->json(['message' => 'Delivery accepted.']);
         });
     }
 
     /**
-     * Delivery receipt for a dispatch. The header (truck/crew/date) is this
-     * specific dispatch, but the item list pulls in every other dispatch
-     * under the same order, so a customer who received several truckloads
-     * for one order sees the full manifest, not just this one product.
+     * Driver marks an accepted/on-route delivery as delivered.
+     * Every dispatch in the group is completed together.
+     *
+     * POST /api/driver/deliveries/{dispatch}/deliver
+     */
+    public function deliver(Request $request, Dispatch $dispatch)
+    {
+        $driverId = $request->user()->DriverID;
+
+        if (!$driverId) {
+            return response()->json([
+                'message' => 'This account is not linked to a driver profile.',
+            ], 403);
+        }
+
+        if (!$this->isAssignedToDriver($dispatch, $driverId)) {
+            return response()->json([
+                'message' => 'This delivery is not assigned to you.',
+            ], 403);
+        }
+
+        if ($dispatch->Status !== 'On Route') {
+            return response()->json([
+                'message' => 'The delivery must be accepted before it can be marked as delivered.',
+            ], 409);
+        }
+
+        if ($dispatch->delivery()->exists()) {
+            return response()->json([
+                'message' => 'This delivery has already been completed.',
+            ], 409);
+        }
+
+        $group = $this->groupFor($dispatch, $driverId);
+
+        // All-or-nothing: if any dispatch in the group fails, none are marked.
+        DB::transaction(function () use ($group) {
+            foreach ($group as $d) {
+                if ($d->delivery()->exists()) {
+                    continue;
+                }
+
+                // Use the existing DeliveryController so all existing delivery
+                // business rules are applied consistently.
+                $deliveryRequest = Request::create(
+                    "/api/driver/deliveries/{$d->DispatchID}/deliver",
+                    'POST',
+                    [
+                        // Cast: the stored quantity may come back as "11.00",
+                        // which fails the 'integer' validation rule.
+                        'QuantityDelivered' => (int) round((float) $d->QuantityDispatched),
+                        'Status' => 'Delivered',
+                        'Notes' => 'Delivered by driver through the mobile app.',
+                    ]
+                );
+
+                app(DeliveryController::class)->store($deliveryRequest, $d);
+            }
+        });
+
+        return response()->json([
+            'message' => 'Delivery marked as delivered.',
+            'dispatch_id' => $dispatch->DispatchID,
+            'status' => 'Delivered',
+        ]);
+    }
+
+    /**
+     * Delivery receipt. The header (truck/crew/date) is this dispatch, but
+     * the item list pulls in every non-failed dispatch under the same order,
+     * so a customer who received several truckloads sees the full manifest.
      *
      * GET /api/driver/deliveries/{dispatch}/receipt
      */
@@ -128,9 +214,10 @@ class DriverDeliveryController extends Controller
             return response()->json(['message' => 'Delivery not found.'], 404);
         }
 
-        // Every dispatch under the same order (any truck/driver), so the
-        // receipt shows the full manifest, not just this one truckload.
+        // Every dispatch under the same order (any truck/driver), excluding
+        // failed/cancelled ones, so the receipt shows the real manifest.
         $orderDispatches = Dispatch::with(['orderItem.product'])
+            ->where('Status', '!=', 'Failed')
             ->whereHas('orderItem', fn ($q) => $q->where('OrderID', $order->OrderID))
             ->get();
 
@@ -159,6 +246,7 @@ class DriverDeliveryController extends Controller
             'receipt' => [
                 'dispatch_id' => $dispatch->DispatchID,
                 'order_id' => $order->OrderID,
+                'dispatch_status' => $dispatch->Status,
                 'delivered_at' => optional($deliveredAt)->toIso8601String(),
                 'truck_name' => $dispatch->truck?->TruckName,
                 'plate_number' => $dispatch->truck?->PlateNumber,
@@ -175,16 +263,56 @@ class DriverDeliveryController extends Controller
         return $dispatch->drivers()->where('drivers.DriverID', $driverId)->exists();
     }
 
-    private function formatDispatch(Dispatch $dispatch, $driverId): array
+    /**
+     * All dispatches that belong to the same driver-facing delivery as the
+     * given one: same order, same truck, same status, same driver.
+     * Always includes the given dispatch itself.
+     */
+    private function groupFor(Dispatch $dispatch, $driverId)
     {
+        $orderId = $dispatch->orderItem?->OrderID;
+
+        $group = Dispatch::with(['orderItem.order', 'orderItem.product', 'truck', 'drivers'])
+            ->where('TruckID', $dispatch->TruckID)
+            ->where('Status', $dispatch->Status)
+            ->whereHas('orderItem', fn ($q) => $q->where('OrderID', $orderId))
+            ->whereHas('drivers', fn ($q) => $q->where('drivers.DriverID', $driverId))
+            ->orderBy('DispatchID')
+            ->get();
+
+        return $group->isEmpty() ? collect([$dispatch]) : $group;
+    }
+
+    private function formatDispatch(Dispatch $dispatch, $driverId, $group = null): array
+    {
+        $group = $group ?? collect([$dispatch]);
+
         $orderItem = $dispatch->orderItem;
         $order = $orderItem?->order;
         $product = $orderItem?->product;
         $truck = $dispatch->truck;
         $myPivot = $dispatch->drivers->firstWhere('DriverID', $driverId)?->pivot;
 
+        // Manifest for THIS truckload only (the group's dispatches), one line
+        // per order item.
+        $items = $group
+            ->filter(fn ($d) => $d->orderItem && $d->orderItem->product)
+            ->groupBy('OrderItemID')
+            ->map(function ($g) {
+                $itemProduct = $g->first()->orderItem->product;
+
+                return [
+                    'product_name' => $itemProduct->Product_Name,
+                    'unit' => $itemProduct->Unit,
+                    'quantity' => $g->sum('QuantityDispatched'),
+                ];
+            })
+            ->values()
+            ->all();
+
         return [
             'DispatchID' => $dispatch->DispatchID,
+            'DispatchIDs' => $group->pluck('DispatchID')->values()->all(),
             'DispatchDate' => optional($dispatch->DispatchDate)->toIso8601String(),
             'QuantityDispatched' => $dispatch->QuantityDispatched,
             'DispatchStatus' => $dispatch->Status,
@@ -193,10 +321,13 @@ class DriverDeliveryController extends Controller
             'CustomerName' => $order?->CustomerName,
             'Address' => $order?->Address,
             'ContactNumber' => $order?->ContactNumber,
+            // Keep the original single-dispatch fields for compatibility.
             'Product_Name' => $product?->Product_Name,
             'Unit' => $product?->Unit,
             'TruckName' => $truck?->TruckName,
             'PlateNumber' => $truck?->PlateNumber,
+            // Manifest for this truckload.
+            'Items' => $items,
         ];
     }
 }
