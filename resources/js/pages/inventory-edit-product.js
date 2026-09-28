@@ -40,10 +40,6 @@
         activeInventoryId = btn.dataset.inventoryId;
 
         document.getElementById('editFldName').value = btn.dataset.name || '';
-        document.getElementById('editFldSku').value = btn.dataset.sku || '';
-        document.getElementById('editFldCategory').value = btn.dataset.category || 'Tools';
-        document.getElementById('editFldUnit').value = btn.dataset.unit || '';
-        document.getElementById('editFldSubCategory').value = btn.dataset.subcategory || '';
         document.getElementById('editFldPrice').value = btn.dataset.price || '';
         document.getElementById('editFldVariablePricing').checked = (btn.dataset.pricingType || 'Fixed') === 'Variable';
         document.getElementById('editFldReorderLevel').value = btn.dataset.reorderLevel || '';
@@ -123,10 +119,6 @@
 
         const payload = {
             Product_Name: document.getElementById('editFldName').value.trim(),
-            SKU: document.getElementById('editFldSku').value.trim() || undefined,
-            Unit: document.getElementById('editFldUnit').value.trim(),
-            Category: document.getElementById('editFldCategory').value,
-            SubCategory: document.getElementById('editFldSubCategory').value.trim(),
             Price: document.getElementById('editFldPrice').value || null,
             Pricing_type: document.getElementById('editFldVariablePricing').checked ? 'Variable' : 'Fixed',
             ReorderLevel: document.getElementById('editFldReorderLevel').value || undefined,

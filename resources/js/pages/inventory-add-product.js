@@ -119,7 +119,6 @@
     function updateHeaderStats(inventory) {
         const statTotal = document.getElementById('statTotal');
         const statValue = document.getElementById('statValue');
-        const statOut = document.getElementById('statOut');
         const statLow = document.getElementById('statLow');
 
         const qty = Number(inventory.QuantityOnHand);
@@ -135,9 +134,7 @@
             }
         }
 
-        if (qty <= 0 && statOut) {
-            statOut.textContent = String(Number(statOut.textContent || '0') + 1);
-        } else if (qty > 0 && qty <= reorderLevel && statLow) {
+        if (qty > 0 && qty <= reorderLevel && statLow) {
             statLow.textContent = String(Number(statLow.textContent || '0') + 1);
         }
     }

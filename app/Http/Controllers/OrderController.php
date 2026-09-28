@@ -49,7 +49,7 @@ class OrderController extends Controller
                 'Address' => $validated['Address'] ?? null,
                 'ContactNumber' => $validated['ContactNumber'] ?? null,
                 'OrderDate' => now(),
-                'PaymentStatus' => 'Unpaid',
+                'PaymentStatus' => 'Payable',
                 'Status' => 'Pending',
                 'CreatedBy' => auth()->id(),
             ]);
@@ -103,7 +103,7 @@ class OrderController extends Controller
             'Address' => 'nullable|string',
             'ContactNumber' => 'nullable|string',
             'Status' => 'nullable|string',
-            'PaymentStatus' => 'nullable|string',
+            'PaymentStatus' => 'nullable|in:Paid,Payable,Unpaid',
             'items' => 'sometimes|array|min:1',
             'items.*.ProductID' => 'required_with:items|exists:products,ProductID',
             'items.*.Quantity' => 'required_with:items|integer|min:1',
@@ -166,7 +166,7 @@ class OrderController extends Controller
     }
     public function updateStatus(Order $order){
         if ($order->isFullyDelivered()) {
-            $order->update(['Status' => 'Completed']);
+            $order->update(['Status' => 'Completed', 'PaymentStatus' => 'Paid']);
         } elseif ($order->orderItems->contains(fn($i) => $i->quantityDispatched() > 0)) {
             $order->update(['Status' => 'Partially Fulfilled']);
         }
@@ -174,7 +174,7 @@ class OrderController extends Controller
     }
     public function syncStatus(Order $order){
         if ($order->isFullyDelivered()) {
-            $order->update(['Status' => 'Completed']);
+            $order->update(['Status' => 'Completed', 'PaymentStatus' => 'Paid']);
         } elseif ($order->orderItems->contains(fn($i) => $i->quantityDispatched() > 0)) {
             $order->update(['Status' => 'Partially Fulfilled']);
         }

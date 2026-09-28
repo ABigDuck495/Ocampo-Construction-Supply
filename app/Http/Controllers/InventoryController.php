@@ -161,9 +161,9 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'Product_Name'   => 'required|string|max:255',
-            'Unit'           => 'required|string|max:50',
-            'Category'       => 'required|string|max:255',
-            'SubCategory'    => 'required|string|max:255',
+            'Unit'           => 'nullable|string|max:50',
+            'Category'       => 'nullable|string|max:255',
+            'SubCategory'    => 'nullable|string|max:255',
             'SKU'            => 'nullable|string|max:100|unique:products,SKU,' . $inventory->ProductID . ',ProductID',
             'Price'          => 'nullable|numeric|min:0',
             'Pricing_type'   => ['nullable', 'string'],
@@ -176,11 +176,11 @@ class InventoryController extends Controller
 
             $inventory->product->update([
                 'Product_Name'   => $validated['Product_Name'],
-                'Unit'           => $validated['Unit'],
-                'Category'       => $validated['Category'],
-                'SubCategory'    => $validated['SubCategory'],
-                'SKU'            => $validated['SKU'] ?? null,
-                'Price'          => $validated['Price'] ?? null,
+                'Unit'           => $validated['Unit'] ?? $inventory->product->Unit,
+                'Category'       => $validated['Category'] ?? $inventory->product->Category,
+                'SubCategory'    => $validated['SubCategory'] ?? $inventory->product->SubCategory,
+                'SKU'            => $validated['SKU'] ?? $inventory->product->SKU,
+                'Price'          => $validated['Price'] ?? $inventory->product->Price,
                 'Pricing_type'   => $pricingType,
                 'Pricing_status' => $pricingStatus,
             ]);

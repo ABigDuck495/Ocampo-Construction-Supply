@@ -194,7 +194,7 @@ $staffId = DB::table('users')
         // 6. Orders
         // ----------------------------------------
         $orderStatuses = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
-        $paymentStatuses = ['Paid', 'Unpaid'];
+        $paymentStatuses = ['Paid', 'Payable'];
         $orderIds = [];
 
         for ($i = 0; $i < 20; $i++) {
@@ -322,7 +322,7 @@ $katherynOrderId = DB::table('orders')->insertGetId([
     'Address'       => 'Customer Address',
     'ContactNumber' => '09170000001',
     'OrderDate'     => now(),
-    'PaymentStatus' => 'Unpaid',
+    'PaymentStatus' => 'Payable',
     'Status'        => 'Pending',
     'Notes'         => 'Test pending delivery',
     'CreatedBy'     => $staffId,
@@ -399,7 +399,7 @@ $joOrderId = DB::table('orders')->insertGetId([
     'Address'       => 'Customer Address',
     'ContactNumber' => '09170000002',
     'OrderDate'     => now(),
-    'PaymentStatus' => 'Unpaid',
+    'PaymentStatus' => 'Payable',
     'Status'        => 'Pending',
     'Notes'         => 'Test pending delivery',
     'CreatedBy'     => $staffId,

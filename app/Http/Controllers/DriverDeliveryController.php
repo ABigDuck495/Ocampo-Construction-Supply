@@ -182,6 +182,11 @@ class DriverDeliveryController extends Controller
                 );
 
                 app(DeliveryController::class)->store($deliveryRequest, $d);
+
+                $order = $d->orderItem?->order;
+                if ($order) {
+                    $order->update(['PaymentStatus' => 'Paid']);
+                }
             }
         });
 

@@ -8,6 +8,10 @@ class Order extends Model
 {
     protected $table = 'orders';
     protected $primaryKey = 'OrderID';
+
+    public const PAYMENT_STATUS_PAYABLE = 'Payable';
+    public const PAYMENT_STATUS_PAID = 'Paid';
+
     protected $fillable = [
        'CustomerName',
         'Address',
@@ -19,6 +23,32 @@ class Order extends Model
         'CreatedBy',
     ];
     protected $guarded = ['OrderID'];
+
+    public static function normalizePaymentStatus($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return match ($normalized) {
+            'Unpaid', 'Payable' => self::PAYMENT_STATUS_PAYABLE,
+            'Paid' => self::PAYMENT_STATUS_PAID,
+            default => $normalized,
+        };
+    }
+
+    public function getPaymentStatusAttribute($value)
+    {
+        return self::normalizePaymentStatus($value);
+    }
+
+    public function setPaymentStatusAttribute($value)
+    {
+        $this->attributes['PaymentStatus'] = self::normalizePaymentStatus($value);
+    }
+
     public function orderItems(){
         return $this->hasMany(OrderItem::class, 'OrderID', 'OrderID');
     }
@@ -43,8 +73,11 @@ class Order extends Model
     public function scopePaid($query) {
         return $query->where('PaymentStatus', 'Paid');
     }
+    public function scopePayable($query) {
+        return $query->whereIn('PaymentStatus', ['Payable', 'Unpaid']);
+    }
     public function scopeUnpaid($query) {
-        return $query->where('PaymentStatus', 'Unpaid');
+        return $query->whereIn('PaymentStatus', ['Payable', 'Unpaid']);
     }
     public function scopeToday($query) {
         return $query->whereDate('OrderDate', now()->toDateString());
@@ -70,5 +103,14 @@ class Order extends Model
             });
             return $deliveredQty >= $item->Quantity;
         });
+    }
+
+    public function markPaymentStatusByDeliveryState(): void
+    {
+        $newStatus = $this->isFullyDelivered() ? self::PAYMENT_STATUS_PAID : self::PAYMENT_STATUS_PAYABLE;
+
+        if ($this->PaymentStatus !== $newStatus) {
+            $this->update(['PaymentStatus' => $newStatus]);
+        }
     }
 }

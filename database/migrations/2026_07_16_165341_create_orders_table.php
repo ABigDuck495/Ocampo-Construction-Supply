@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('Address')->nullable();
             $table->string('ContactNumber')->nullable();
             $table->timestamp('OrderDate')->nullable() ;
-            $table->enum('PaymentStatus', ['Paid', 'Unpaid'])->default('Unpaid');
+            $table->enum('PaymentStatus', ['Paid', 'Payable'])->default('Payable');
             $table->enum('Status', ['Pending', 'In Progress', 'Partially Fulfilled', 'Completed', 'Cancelled'])->default('Pending');
             $table->string('Notes')->nullable();
             $table->unsignedBigInteger(('CreatedBy'))->nullable();

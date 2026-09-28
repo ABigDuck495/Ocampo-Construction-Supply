@@ -137,7 +137,7 @@ class TransactionController extends Controller
             'ContactNumber' => 'nullable|string',
             'Address' => 'nullable|string',
             'Notes' => 'nullable|string',
-            'PaymentStatus' => 'required|in:Paid,Unpaid',
+            'PaymentStatus' => 'required|in:Paid,Payable,Unpaid',
         ]);
 
         $isPickup = $validated['OrderType'] === 'Pickup';

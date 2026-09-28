@@ -44,6 +44,8 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::view('homepage', 'homepage.index')->name('homepage.index');
+
     Route::middleware(['role:Admin,Staff'])->group(function () {
         Route::post('dispatches/{dispatch}/deliveries', [DeliveryController::class, 'store'])->name('deliveries.storeForDispatch');
         Route::get('dispatches/unassigned', [DispatchController::class, 'unassignedItems'])->name('dispatches.unassigned');

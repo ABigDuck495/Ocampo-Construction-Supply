@@ -59,12 +59,10 @@ function renderStats() {
     const total = state.products.length;
     const value = state.products.reduce((sum, p) => sum + p.price * p.stock, 0);
     const low = state.products.filter(p => p.stock > 0 && p.stock < LOW_STOCK_THRESHOLD).length;
-    const out = state.products.filter(p => p.stock <= 0).length;
 
     document.getElementById('statTotal').textContent = total;
     document.getElementById('statValue').textContent = fmtMoney(value);
     document.getElementById('statLow').textContent = low;
-    document.getElementById('statOut').textContent = out;
     document.getElementById('headerSub').textContent = `${total} product${total === 1 ? '' : 's'} registered`;
 }
 

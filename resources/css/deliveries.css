@@ -58,7 +58,40 @@ body{
 /* ============================================================
    MAIN CONTENT (DELIVERY OPS)
    ============================================================ */
-.main{flex:1;min-width:0;padding:20px 24px 40px;}
+.main{
+    flex:1;
+    min-width:0;
+}
+
+.main.delivery-main{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    padding:20px 24px 0;
+}
+
+.page-toolbar{
+    position:sticky;
+    top:0;
+    z-index:30;
+    margin-top:-28px;
+    padding-top:28px;
+    padding-bottom:1px;
+    background:var(--bg);
+}
+
+.delivery-toolbar{
+    flex-shrink:0;
+    background:var(--bg);
+}
+
+.delivery-content{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    padding-bottom:20px;
+}
 
 .header{
     position:relative;
@@ -143,6 +176,7 @@ body{
 
 /* ---------- PAYMENT STATUS BADGES ---------- */
 .badge.status-paid{color:var(--green);}
+.badge.status-payable{color:var(--orange);}
 .badge.status-unpaid{color:var(--red);}
 
 .oc-name{font-size:15px;font-weight:800;margin:2px 0 8px;}
