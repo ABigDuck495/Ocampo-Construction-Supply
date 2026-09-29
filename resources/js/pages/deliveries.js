@@ -622,7 +622,11 @@ async function openAssignModal(orderId, truckId){
     if(!order || !truck) return;
 
     const remainingCapacity = TRUCK_CAPACITY_TRACKING ? truck.capacity - truckCargo(truck) : Number.POSITIVE_INFINITY;
-    const drivers = await fetchAvailableDrivers();
+    const truckKey = String(truckId);
+    const hasWaitingOrder = orders.some(item => String(item.truck) === truckKey && item.status === 'assigned');
+    const savedSelection = pendingDispatchDriversByTruck.get(truckKey);
+    const reuseDriverSelection = hasWaitingOrder && Boolean(savedSelection?.driverId);
+    const drivers = reuseDriverSelection ? [] : await fetchAvailableDrivers();
 
     const rows = order.items.map((item, idx) => `
         <div class="doa-item-row">
@@ -657,16 +661,17 @@ async function openAssignModal(orderId, truckId){
             <div class="doa-modal-sub">Pick how many of each item to send now (pasabay). Anything left over stays pending for the next delivery run.</div>
             <div class="doa-item-list">${rows}</div>
             <div class="doa-modal-note" id="doaCapNote"></div>
+            ${reuseDriverSelection ? '' : `
+                <label class="doa-field-label">MAIN DRIVER</label>
+                <select class="doa-select" id="doaMainDriver" ${drivers.length ? '' : 'disabled'}>
+                    ${mainDriverSelect()}
+                </select>
 
-            <label class="doa-field-label">MAIN DRIVER</label>
-            <select class="doa-select" id="doaMainDriver" ${drivers.length ? '' : 'disabled'}>
-                ${mainDriverSelect()}
-            </select>
-
-            <label class="doa-field-label">HELPER <span class="doa-optional">(optional)</span></label>
-            <select class="doa-select" id="doaHelperDriver">
-                ${buildHelperOptions()}
-            </select>
+                <label class="doa-field-label">HELPER <span class="doa-optional">(optional)</span></label>
+                <select class="doa-select" id="doaHelperDriver">
+                    ${buildHelperOptions()}
+                </select>
+            `}
 
             <div class="doa-modal-actions">
                 <button class="btn-ghost" id="doaCancelBtn">CANCEL</button>
@@ -679,7 +684,7 @@ async function openAssignModal(orderId, truckId){
     const mainDriverSelectEl = overlay.querySelector('#doaMainDriver');
     const helperDriverSelectEl = overlay.querySelector('#doaHelperDriver');
 
-    mainDriverSelectEl.addEventListener('change', () => {
+    mainDriverSelectEl?.addEventListener('change', () => {
         const selectedMainId = mainDriverSelectEl.value;
         const currentlySelectedHelper = helperDriverSelectEl.value;
         helperDriverSelectEl.innerHTML = buildHelperOptions(selectedMainId, currentlySelectedHelper === selectedMainId ? '' : currentlySelectedHelper);
@@ -710,19 +715,16 @@ async function openAssignModal(orderId, truckId){
             qty: Math.max(0, Math.min(parseFloat(inp.value) || 0, order.items[Number(inp.dataset.idx)].qty)),
         }));
         const cargo = chosen.reduce((s, c) => s + c.qty, 0);
-        const mainDriverId = overlay.querySelector('#doaMainDriver')?.value || '';
-        const helperDriverId = overlay.querySelector('#doaHelperDriver')?.value || '';
+        const selection = reuseDriverSelection ? savedSelection : {
+            driverId: overlay.querySelector('#doaMainDriver')?.value || '',
+            boardmateId: overlay.querySelector('#doaHelperDriver')?.value || null,
+        };
 
         if(cargo <= 0){ alert('Pick at least one item to send.'); return; }
         if (TRUCK_CAPACITY_TRACKING && cargo > remainingCapacity){ alert(`${truck.name} doesn't have enough capacity left for this selection.`); return; }
-        if (!mainDriverId) { alert('Please select a main driver before dispatching.'); return; }
+        if (!selection?.driverId) { alert('Please select a main driver before dispatching.'); return; }
 
-        const selection = {
-            driverId: mainDriverId,
-            boardmateId: helperDriverId || null,
-        };
-
-        pendingDispatchDriversByTruck.set(String(truckId), selection);
+        pendingDispatchDriversByTruck.set(truckKey, selection);
         close();
         applyPasabaySplit(order, truck, chosen);
     });
