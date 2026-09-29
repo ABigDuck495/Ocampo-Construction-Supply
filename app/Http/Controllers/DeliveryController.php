@@ -65,6 +65,12 @@ class DeliveryController extends Controller
                 $dispatch->update(['Status' => 'Failed']);
                 DispatchController::releaseTruckIfClear($dispatch->TruckID);
 
+                $orderItem = $dispatch->orderItem;
+                if ($orderItem) {
+                    $orderItem->recalculateStatus();
+                    app(OrderController::class)->syncStatus($orderItem->order);
+                }
+
                 DispatchLog::create([
                     'DispatchID' => $dispatch->DispatchID,
                     'Action' => 'Failed',
@@ -96,11 +102,7 @@ class DeliveryController extends Controller
             }
 
             $orderItem = $dispatch->orderItem;
-            if ($orderItem->quantityRemaining() <= 0) {
-                $orderItem->update(['Status' => OrderItem::STATUS_COMPLETED]);
-            } else {
-                $orderItem->update(['Status' => OrderItem::STATUS_IN_PROGRESS]);
-            }
+            $orderItem->recalculateStatus();
 
             app(OrderController::class)->syncStatus($orderItem->order);
 

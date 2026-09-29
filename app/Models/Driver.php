@@ -29,13 +29,13 @@ class Driver extends Model
     {
         return $this->dispatches()
             ->wherePivot('Role', 'Driver')
-            ->where('Status', 'On Route');
+            ->whereIn('Status', ['Pending', 'On Route']);
     }
 
     public function scopeAvailable($query)
     {
         return $query->whereDoesntHave('dispatchDrivers.dispatch', function ($dispatchQuery) {
-            $dispatchQuery->whereIn('Status', ['On Route']);
+            $dispatchQuery->whereIn('Status', ['Pending', 'On Route']);
         })->orderBy('Name');
     }
 

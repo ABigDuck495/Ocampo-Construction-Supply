@@ -125,7 +125,7 @@ class DispatchDriverController extends Controller
     }
     private function isDriverBusy(int $driverId): bool{
         return DispatchDriver::where('DriverID', $driverId)
-            ->whereHas('dispatch', fn($q) => $q->whereIn('Status', ['On Route', 'Delivered']))
+            ->whereHas('dispatch', fn($q) => $q->whereIn('Status', ['Pending', 'On Route']))
             ->exists();
     }
     public function history(Driver $driver){

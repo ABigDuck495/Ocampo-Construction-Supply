@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -165,19 +166,27 @@ class OrderController extends Controller
         return response()->json(['message' => 'Order deleted successfully.'], 200);
     }
     public function updateStatus(Order $order){
-        if ($order->isFullyDelivered()) {
-            $order->update(['Status' => 'Completed', 'PaymentStatus' => 'Paid']);
-        } elseif ($order->orderItems->contains(fn($i) => $i->quantityDispatched() > 0)) {
-            $order->update(['Status' => 'Partially Fulfilled']);
-        }
-        return $order;
+        return $this->syncStatus($order);
     }
     public function syncStatus(Order $order){
-        if ($order->isFullyDelivered()) {
-            $order->update(['Status' => 'Completed', 'PaymentStatus' => 'Paid']);
-        } elseif ($order->orderItems->contains(fn($i) => $i->quantityDispatched() > 0)) {
-            $order->update(['Status' => 'Partially Fulfilled']);
+        $items = $order->orderItems()->get();
+
+        if ($items->isEmpty()) {
+            $order->update(['Status' => 'Pending', 'PaymentStatus' => 'Payable']);
+            return $order;
         }
+
+        if ($items->every(fn($item) => $item->Status === OrderItem::STATUS_COMPLETED)) {
+            $order->update(['Status' => 'Completed', 'PaymentStatus' => 'Paid']);
+            return $order;
+        }
+
+        if ($items->contains(fn($item) => $item->Status === OrderItem::STATUS_IN_PROGRESS || $item->quantityDispatched() > 0)) {
+            $order->update(['Status' => 'Partially Fulfilled', 'PaymentStatus' => 'Payable']);
+            return $order;
+        }
+
+        $order->update(['Status' => 'Pending', 'PaymentStatus' => 'Payable']);
         return $order;
     }
 }

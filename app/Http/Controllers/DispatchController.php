@@ -132,6 +132,12 @@ class DispatchController extends Controller
             $dispatch->update(['Status' => 'Failed']);
             self::releaseTruckIfClear($dispatch->TruckID);
 
+            $orderItem = $dispatch->orderItem;
+            if ($orderItem) {
+                $orderItem->recalculateStatus();
+                app(OrderController::class)->syncStatus($orderItem->order);
+            }
+
             DispatchLog::create([
                 'DispatchID' => $dispatch->DispatchID,
                 'Action' => 'Failed',

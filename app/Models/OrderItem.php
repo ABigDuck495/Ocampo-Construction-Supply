@@ -107,4 +107,22 @@ class OrderItem extends Model
     public function quantityRemaining() {
         return (float) $this->Quantity - $this->quantityDispatched();
     }
+
+    public function recalculateStatus(): void
+    {
+        $quantity = (float) ($this->Quantity ?? 0);
+        $dispatched = (float) $this->quantityDispatched();
+
+        if ($quantity <= 0 || $dispatched <= 0) {
+            $status = self::STATUS_PENDING;
+        } elseif ($dispatched >= $quantity) {
+            $status = self::STATUS_COMPLETED;
+        } else {
+            $status = self::STATUS_IN_PROGRESS;
+        }
+
+        if ($this->Status !== $status) {
+            $this->update(['Status' => $status]);
+        }
+    }
 }
