@@ -101,6 +101,14 @@ class DriverDeliveryController extends Controller
             ], 409);
         }
 
+        $myPivot = $dispatch->drivers->firstWhere('DriverID', $driverId)?->pivot;
+
+        if ($myPivot?->Role !== 'Driver') {
+            return response()->json([
+                'message' => 'Only the assigned driver can accept this delivery. Helpers cannot accept.',
+            ], 403);
+        }
+
         $group = $this->groupFor($dispatch, $driverId);
 
         return DB::transaction(function () use ($group, $dispatch) {
@@ -127,6 +135,14 @@ class DriverDeliveryController extends Controller
     /**
      * Driver marks an accepted/on-route delivery as delivered.
      * Every dispatch in the group is completed together.
+     *
+     * Body (optional): {
+     *   "items": [{"DispatchID": 12, "QuantityDelivered": 9}, ...],
+     *   "Notes": "customer not home for 2 bags"
+     * }
+     * If "items" is omitted, every dispatch in the group is delivered in
+     * full (legacy behavior, still used by anything that just POSTs here
+     * with no body).
      *
      * POST /api/driver/deliveries/{dispatch}/deliver
      */
@@ -159,25 +175,54 @@ class DriverDeliveryController extends Controller
         }
 
         $group = $this->groupFor($dispatch, $driverId);
+        $groupIds = $group->pluck('DispatchID')->all();
+
+        $validated = $request->validate([
+            'items' => 'sometimes|array',
+            'items.*.DispatchID' => 'required_with:items|integer',
+            'items.*.QuantityDelivered' => 'required_with:items|integer|min:0',
+            'Notes' => 'nullable|string',
+        ]);
+
+        // Map submitted quantities by dispatch id, rejecting anything that
+        // doesn't belong to this delivery's group.
+        $quantities = [];
+        foreach ($validated['items'] ?? [] as $item) {
+            $itemDispatchId = (int) $item['DispatchID'];
+
+            if (!in_array($itemDispatchId, $groupIds, true)) {
+                abort(422, 'One of the submitted items does not belong to this delivery.');
+            }
+
+            $quantities[$itemDispatchId] = (int) $item['QuantityDelivered'];
+        }
+
+        $notes = $validated['Notes'] ?? 'Delivered by driver through the mobile app.';
 
         // All-or-nothing: if any dispatch in the group fails, none are marked.
-        DB::transaction(function () use ($group) {
+        DB::transaction(function () use ($group, $quantities, $notes) {
             foreach ($group as $d) {
                 if ($d->delivery()->exists()) {
                     continue;
                 }
 
+                // Fall back to the full dispatched quantity (cast, since the
+                // stored value may come back as "11.00", which fails the
+                // 'integer' validation rule) when no quantity was submitted
+                // for this dispatch.
+                $qty = $quantities[$d->DispatchID]
+                    ?? (int) round((float) $d->QuantityDispatched);
+
                 // Use the existing DeliveryController so all existing delivery
-                // business rules are applied consistently.
+                // business rules are applied consistently (this also handles
+                // partial deliveries / pasabay automatically).
                 $deliveryRequest = Request::create(
                     "/api/driver/deliveries/{$d->DispatchID}/deliver",
                     'POST',
                     [
-                        // Cast: the stored quantity may come back as "11.00",
-                        // which fails the 'integer' validation rule.
-                        'QuantityDelivered' => (int) round((float) $d->QuantityDispatched),
+                        'QuantityDelivered' => $qty,
                         'Status' => 'Delivered',
-                        'Notes' => 'Delivered by driver through the mobile app.',
+                        'Notes' => $notes,
                     ]
                 );
 
@@ -247,6 +292,26 @@ class DriverDeliveryController extends Controller
 
         $deliveredAt = $dispatch->delivery?->DeliveryDate ?? $dispatch->DispatchDate;
 
+        // Editable line items for the "Confirm Delivery" dialog: only the
+        // dispatches in THIS on-route truckload, each carrying its own
+        // dispatch id and the max (dispatched) quantity that can be
+        // confirmed. Empty once the delivery is completed.
+        $pendingItems = collect();
+
+        if ($dispatch->Status === 'On Route') {
+            $group = $this->groupFor($dispatch, $driverId);
+
+            $pendingItems = $group
+                ->filter(fn ($d) => $d->orderItem && $d->orderItem->product && !$d->delivery()->exists())
+                ->map(fn ($d) => [
+                    'dispatch_id' => $d->DispatchID,
+                    'product_name' => $d->orderItem->product->Product_Name,
+                    'unit' => $d->orderItem->product->Unit,
+                    'quantity_dispatched' => $d->QuantityDispatched,
+                ])
+                ->values();
+        }
+
         return response()->json([
             'receipt' => [
                 'dispatch_id' => $dispatch->DispatchID,
@@ -259,6 +324,7 @@ class DriverDeliveryController extends Controller
                 'customer_name' => $order->CustomerName,
                 'address' => $order->Address,
                 'items' => $items,
+                'pending_items' => $pendingItems,
             ],
         ]);
     }
@@ -322,6 +388,8 @@ class DriverDeliveryController extends Controller
             'QuantityDispatched' => $dispatch->QuantityDispatched,
             'DispatchStatus' => $dispatch->Status,
             'DriverRole' => $myPivot?->Role,
+            // Only the main 'Driver' can accept; a 'Helper' can view but not accept.
+            'CanAccept' => $myPivot?->Role === 'Driver',
             'OrderID' => $order?->OrderID,
             'CustomerName' => $order?->CustomerName,
             'Address' => $order?->Address,
