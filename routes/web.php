@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController as LoginController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DispatchController;
 use App\Http\Controllers\DispatchDriverController;
 use App\Http\Controllers\DriverDeliveryController;
@@ -23,7 +24,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     if (Auth::check()) {
-        return redirect()->route('deliveries.index');
+        return redirect()->route('homepage.index');
     }
 
     return redirect()->route('login');
@@ -44,7 +45,10 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::view('homepage', 'homepage.index')->name('homepage.index');
+    Route::get('homepage', [DashboardController::class, 'index'])->name('homepage.index');
+    Route::get('homepage/revenue', [DashboardController::class, 'revenue'])->name('homepage.revenue');
+    Route::get('dispatches/pending-order-count', [DispatchController::class, 'pendingOrderCount'])
+        ->name('dispatches.pendingOrderCount');
 
     Route::middleware(['role:Admin,Staff'])->group(function () {
         Route::post('dispatches/{dispatch}/deliveries', [DeliveryController::class, 'store'])->name('deliveries.storeForDispatch');

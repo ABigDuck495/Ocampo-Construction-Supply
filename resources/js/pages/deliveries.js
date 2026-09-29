@@ -21,6 +21,7 @@ function groupOrderItems(items) {
     items.forEach(oi => {
         const oid = oi.OrderID;
         const order = oi.order || {};
+        const transaction = order.transactions || {};
         const customer = (order.CustomerName || 'Unknown').trim();
         const groupKey = `${oid}_${customer.toLowerCase()}`;
         if (!map[groupKey]) {
@@ -34,7 +35,8 @@ function groupOrderItems(items) {
                 notes: order.Notes || '',
                 orderType: isPickup ? 'Pickup' : 'Delivery',
                 paymentStatus: order.PaymentStatus || '',
-                total: 0,
+                payment: transaction.PaymentMethod || '',
+                total: Number(transaction.Amount) || 0,
                 items: [],
                 orderItemIds: [],
                 status: 'pending',
@@ -195,11 +197,6 @@ function renderStats(){
     if (headerSub) {
         const customText = headerSub.dataset.defaultText?.trim();
         headerSub.textContent = customText || `${orders.length} orders · ${trucks.length} trucks`;
-    }
-
-    const sidebarBadge = document.getElementById('sidebarBadge');
-    if (sidebarBadge) {
-        sidebarBadge.textContent = pending + assigned + transit;
     }
 
     document.querySelector('.cnt-all').textContent = orders.length;
@@ -1040,8 +1037,9 @@ function buildDeliveryPrintPayload(order){
         address: addressLine || null,
         notes: order.notes || null,
         payment_status: order.paymentStatus || null,
+        payment_method: order.payment || null,
         items: order.items.map(i => ({ name: i.name, qty: i.qty })),
-        total: null,
+        total: order.total,
         footer: 'Thank you for your business!',
     };
 }
@@ -1080,7 +1078,9 @@ function viewReceipt(orderId){
             <div class="doa-receipt-divider"></div>
             <div class="doa-receipt-items">${itemsHtml}</div>
             <div class="doa-receipt-divider"></div>
+            <div class="doa-receipt-meta"><div><b>PAYMENT</b> &middot; ${o.payment || 'N/A'}</div></div>
             <div class="doa-receipt-total"><span>PAYMENT STATUS</span><span>${o.paymentStatus || 'N/A'}</span></div>
+            <div class="doa-receipt-total"><span>TOTAL</span><span>${fmt(o.total)}</span></div>
             <div class="doa-receipt-footer">THANK YOU FOR YOUR BUSINESS</div>
             <div class="doa-receipt-actions">
                 <button class="btn-ghost doa-receipt-close" id="rcptPrintBtn">PRINT</button>
@@ -1150,3 +1150,41 @@ window.cancelPendingDispatch = cancelPendingDispatch;
 window.openDeliveryConfirmModal = openDeliveryConfirmModal;
 window.markReturned = markReturned;
 window.viewDispatchLog = viewDispatchLog;
+
+// Works alongside the existing HTML5 drag-and-drop in deliveries.js.
+// It does NOT handle drops – it only (1) marks the page as "dragging"
+// so trucks light up as drop targets, and (2) auto-scrolls whichever
+// panel the cursor is near the top/bottom edge of while dragging.
+
+(function () {
+    const EDGE = 60;       // px from a panel edge that triggers scrolling
+    const MAX_SPEED = 18;  // px per dragover tick
+
+    document.addEventListener('dragstart', (e) => {
+        if (e.target.closest && e.target.closest('.order-card')) {
+            document.body.classList.add('is-dragging');
+        }
+    });
+
+    const end = () => document.body.classList.remove('is-dragging');
+    document.addEventListener('dragend', end);
+    document.addEventListener('drop', end);
+
+    document.addEventListener('dragover', (e) => {
+        if (!document.body.classList.contains('is-dragging')) return;
+
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const panel = el && el.closest ? el.closest('.ws-scroll') : null;
+        if (!panel) return;
+
+        const r = panel.getBoundingClientRect();
+        const fromTop = e.clientY - r.top;
+        const fromBottom = r.bottom - e.clientY;
+
+        if (fromTop < EDGE) {
+            panel.scrollTop -= Math.ceil(MAX_SPEED * (1 - fromTop / EDGE));
+        } else if (fromBottom < EDGE) {
+            panel.scrollTop += Math.ceil(MAX_SPEED * (1 - fromBottom / EDGE));
+        }
+    });
+})();

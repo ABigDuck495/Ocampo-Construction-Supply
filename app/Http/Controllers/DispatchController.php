@@ -14,12 +14,19 @@ use App\Services\SystemSettings;
 class DispatchController extends Controller
 {
     public function index(){
-        $orders = OrderItem::whereRaw('CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID AND dispatches.Status != \'Failed\')')
-            ->with('product', 'order')
+        $orders = OrderItem::awaitingDispatch()
+            ->with('product', 'order.transactions')
             ->get();
         $trucks = Truck::with('dispatches.orderItem.order', 'dispatches.orderItem.product', 'dispatches.drivers')->get();
 
         return view('deliveries.index', compact('orders', 'trucks'));
+    }
+
+    public function pendingOrderCount()
+    {
+        return response()->json([
+            'count' => OrderItem::awaitingDispatchOrderCount(),
+        ]);
     }
 
     public function create()
@@ -138,9 +145,9 @@ class DispatchController extends Controller
 
     public function unassignedItems()
     {
-        return OrderItem::whereRaw(
-            'CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID AND dispatches.Status != \'Failed\')'
-        )->with('product', 'order')->get();
+        return OrderItem::awaitingDispatch()
+            ->with('product', 'order')
+            ->get();
     }
 
     /**

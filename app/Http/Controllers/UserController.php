@@ -119,7 +119,7 @@ class UserController extends Controller
             'role' => strtolower($user->Role ?? ''),
             'status' => strtolower($user->Status ?? 'active'),
             'lastLogin' => $user->LastLoginAt
-                ? $user->LastLoginAt->format('M j, Y, g:i A')
+                ? $user->LastLoginAt->copy()->setTimezone('Asia/Manila')->format('M j, Y, g:i A')
                 : null,
         ];
     }

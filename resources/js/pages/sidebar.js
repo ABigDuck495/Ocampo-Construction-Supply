@@ -1,12 +1,13 @@
 /* ============================================================
    SIDEBAR BEHAVIOR
    ============================================================
-   Note: the "sidebarBadge" count itself is driven by order data
-   and is updated from js/deliveries.js (renderStats) since it
-   reflects delivery counts. This file only handles nav UI.
+    The delivery badge is rendered from the shared database-backed
+    sidebar view composer. This file only handles navigation UI.
 */
 
 document.addEventListener('DOMContentLoaded', () => {
+    initDeliveryBadge();
+
     const navItems = document.querySelectorAll('.nav-item');
 
     navItems.forEach(item => {
@@ -18,6 +19,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initThemeToggle();
 });
+
+function initDeliveryBadge(){
+    const badge = document.getElementById('sidebarBadge');
+    const countUrl = badge?.dataset.countUrl;
+    if(!badge || !countUrl) return;
+
+    let requestActive = false;
+
+    async function refreshCount(){
+        if(requestActive || document.visibilityState === 'hidden') return;
+        requestActive = true;
+
+        try {
+            const response = await fetch(countUrl, {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store',
+            });
+            if(!response.ok) return;
+
+            const data = await response.json();
+            const count = Math.max(0, Number(data.count) || 0);
+            badge.textContent = count > 0 ? String(count) : '';
+            badge.hidden = count === 0;
+        } catch (error) {
+            console.error('Could not refresh delivery count:', error);
+        } finally {
+            requestActive = false;
+        }
+    }
+
+    refreshCount();
+    window.setInterval(refreshCount, 15000);
+    window.addEventListener('focus', refreshCount);
+    document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') refreshCount();
+    });
+}
 
 /* ---------------- THEME TOGGLE ---------------- */
 const SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';

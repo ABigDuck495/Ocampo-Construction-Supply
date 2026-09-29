@@ -23,6 +23,9 @@ class Order extends Model
         'CreatedBy',
     ];
     protected $guarded = ['OrderID'];
+    protected $casts = [
+        'PaidAt' => 'datetime',
+    ];
 
     public static function normalizePaymentStatus($value): ?string
     {
@@ -46,7 +49,14 @@ class Order extends Model
 
     public function setPaymentStatusAttribute($value)
     {
-        $this->attributes['PaymentStatus'] = self::normalizePaymentStatus($value);
+        $status = self::normalizePaymentStatus($value);
+        $this->attributes['PaymentStatus'] = $status;
+
+        if ($status === self::PAYMENT_STATUS_PAID && $this->getRawOriginal('PaymentStatus') !== self::PAYMENT_STATUS_PAID) {
+            $this->attributes['PaidAt'] = now();
+        } elseif ($status === self::PAYMENT_STATUS_PAYABLE && $this->getRawOriginal('PaymentStatus') === self::PAYMENT_STATUS_PAID) {
+            $this->attributes['PaidAt'] = null;
+        }
     }
 
     public function orderItems(){
@@ -92,7 +102,11 @@ class Order extends Model
         return $query->whereBetween('OrderDate', [$startDate, $endDate]);
     }
     public function totalAmount() {
-        return $this->transactions ? $this->transactions->Amount : 0;
+        if ($this->transactions) {
+            return (float) $this->transactions->Amount;
+        }
+
+        return $this->orderItems->sum(fn ($item) => $item->subtotal());
     }
     public function isFullyDelivered() {
         return $this->orderItems->every(function ($item) {

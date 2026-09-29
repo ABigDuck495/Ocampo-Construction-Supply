@@ -2,6 +2,8 @@
 // INVENTORY / PRODUCT CATALOG
 // ============================================================
 
+import { fuzzySearch } from '../fuzzySearch.js';
+
 const LOW_STOCK_THRESHOLD = 20;
 
 const CATEGORY_ICONS = {
@@ -67,15 +69,11 @@ function renderStats() {
 }
 
 function getFiltered() {
-    const q = state.search.trim().toLowerCase();
-    return state.products.filter(p => {
-        const matchesCat = state.category === 'all' || p.category === state.category;
-        const matchesSearch = !q ||
-            p.name.toLowerCase().includes(q) ||
-            p.sku.toLowerCase().includes(q) ||
-            p.category.toLowerCase().includes(q);
-        return matchesCat && matchesSearch;
-    });
+    const categoryProducts = state.category === 'all'
+        ? state.products
+        : state.products.filter(product => product.category === state.category);
+
+    return fuzzySearch(categoryProducts, state.search, ['name', 'sku', 'category', 'subCategory']);
 }
 
 function renderTable() {

@@ -378,3 +378,135 @@ body{
     margin-top:6px;
     border-top:1px dashed var(--border);
 }
+
+
+.main.delivery-main{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    padding:20px 24px 16px;
+}
+.delivery-toolbar{flex-shrink:0;}
+.delivery-toolbar .header{margin-bottom:12px;padding:14px 22px;}
+.delivery-toolbar .tabs{margin-bottom:12px;}
+
+/* ---------- 2 x 2 grid: Receipts | Log  /  Fleet ---------- */
+.board.delivery-workspace{
+    flex:1;
+    min-height:0;                       /* lets children shrink & scroll */
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 360px;
+    grid-template-rows:minmax(0,1.35fr) minmax(0,1fr);
+    gap:16px;
+    align-items:stretch;
+}
+.receipts-panel{grid-column:1;grid-row:1;}
+.log-panel{grid-column:2;grid-row:1;}
+.fleet-panel{grid-column:1 / -1;grid-row:2;}
+
+/* ---------- Panel shell ---------- */
+.ws-panel{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:0;
+    background:var(--panel-alt);
+    border:2px solid var(--border);
+    padding:12px 14px;
+}
+.ws-head{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:0 2px 10px;
+    margin-bottom:10px;
+    border-bottom:2px solid var(--border);
+}
+.ws-head .hint{margin:0;}
+.ws-head.fleet-head{padding:0 2px 10px;margin-bottom:10px;}
+.log-tabs{flex-shrink:0;}
+
+/* The scrolling region inside every panel */
+.ws-scroll{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;        /* wheel never chains to the page */
+    padding-right:4px;
+    scrollbar-width:thin;
+    scrollbar-color:var(--border) transparent;
+}
+
+/* ---------- Receipts: grid of cards ---------- */
+.order-list{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
+    gap:12px;
+    align-items:start;
+}
+
+/* ---------- Dispatch log: scroll handled by .ws-scroll ---------- */
+.log-list{max-height:none;overflow:visible;padding-right:0;}
+
+/* ---------- Active fleet: trucks side by side ---------- */
+.truck-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(310px,1fr));
+    gap:14px;
+    align-items:start;
+}
+.truck-card{transition:border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .15s ease;}
+
+/* Clear drop-target feedback while an order is being dragged */
+body.is-dragging .truck-card{
+    border-style:dashed;
+    border-color:var(--orange-dark);
+}
+.truck-card.drop-active,
+body.is-dragging .truck-card.drop-active{
+    border-style:solid;
+    border-color:var(--orange);
+    background:rgba(245,166,35,.10);
+    box-shadow:0 0 0 3px var(--orange-glow);
+    transform:translateY(-2px);
+}
+/* keep long cargo lists inside the truck card manageable */
+.tc-orders{max-height:170px;overflow-y:auto;}
+
+/* Never let the dragged card be clipped or block hit-testing */
+.order-card.dragging{opacity:.35;}
+.order-card{touch-action:none;}
+
+/* ---------- Receipt / order details modal ----------
+   Adjust the selectors below to the modal classes used in
+   deliveries.js (common names shown). Only the body scrolls. */
+.modal-backdrop,.modal-overlay,.receipt-overlay{
+    position:fixed;inset:0;z-index:100;
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;
+    background:rgba(0,0,0,.6);
+}
+.modal,.receipt-modal,.modal-box{
+    display:flex;flex-direction:column;
+    width:min(560px,100%);
+    max-height:calc(100vh - 40px);
+    overflow:hidden;                    /* shell doesn't scroll */
+}
+.modal-header,.receipt-head{flex-shrink:0;}
+.modal-body,.receipt-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+.modal-footer,.receipt-foot{flex-shrink:0;}
+
+/* ---------- Responsive: stack, page scrolls, panels stay capped ---------- */
+@media (max-width:1100px){
+    .main.delivery-main{height:auto;min-height:100vh;overflow:visible;}
+    .board.delivery-workspace{
+        display:flex;flex-direction:column;flex:none;
+    }
+    .receipts-panel{height:70vh;}
+    .log-panel{height:50vh;}
+    .fleet-panel{height:auto;max-height:none;}
+    .fleet-panel .ws-scroll{overflow:visible;}
+}

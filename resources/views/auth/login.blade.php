@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ocampo Construction and Hardware Supplies</title>
 
-    @vite('resources/css/app.css') {{-- adjust to your app's compiled Tailwind entry --}}
+    @vite('resources/css/app.css')
 
     <script>
         // Apply saved theme before paint, to avoid a flash of the wrong theme

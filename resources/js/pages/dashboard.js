@@ -5,6 +5,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     initClock();
     initCountUp();
+    initRevenueRefresh();
 });
 
 // ---------- Live clock ----------
@@ -61,5 +62,46 @@ function initCountUp() {
         };
 
         requestAnimationFrame(step);
+    });
+}
+
+function initRevenueRefresh() {
+    const revenueEl = document.querySelector('[data-live-revenue]');
+    const endpoint = revenueEl?.dataset.revenueUrl;
+    if (!revenueEl || !endpoint) return;
+
+    let requestActive = false;
+
+    async function refreshRevenue() {
+        if (requestActive || document.visibilityState === 'hidden') return;
+        requestActive = true;
+
+        try {
+            const response = await fetch(endpoint, {
+                headers: { Accept: 'application/json' },
+                cache: 'no-store',
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            const revenue = Number(data.todayRevenue);
+            if (!Number.isFinite(revenue)) return;
+
+            revenueEl.dataset.count = String(revenue);
+            revenueEl.textContent = revenue.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        } catch (error) {
+            console.error('Could not refresh dashboard revenue:', error);
+        } finally {
+            requestActive = false;
+        }
+    }
+
+    window.setInterval(refreshRevenue, 15000);
+    window.addEventListener('focus', refreshRevenue);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') refreshRevenue();
     });
 }

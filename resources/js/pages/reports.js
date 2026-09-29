@@ -1,11 +1,26 @@
 /* ============================================================
-   REPORTS - DATA + LOGIC
+   REPORTS - DATA + LOGIC (LIVE)
    Filtered by Month/Year + Report Type (orders | items) selectors.
    Header stat bar (top orange strip) has its OWN month/year picker,
    independent of the Sales Summary filter below it, so you can glance
    at any past month's totals without clicking Generate Report or
    exporting a file. Defaults to the current month on page load.
+
+   LIVE UPDATES
+   - The page re-requests /reports/data and /reports/summary every
+     POLL_INTERVAL_MS while the tab is visible, and immediately when
+     the tab becomes visible again.
+   - Polling always uses the filters from the LAST Generate/change, so
+     a half-changed dropdown never silently swaps the data.
+   - Only one poll runs at a time; a user action (Generate, month/year,
+     report type) cancels an in-flight poll so stale data never wins.
+   - The DOM is only re-rendered when the payload actually changed, and
+     expanded daily-summary cards stay expanded across refreshes.
+   - Other pages in the same browser can trigger an instant refresh with:
+         new BroadcastChannel('ocampo-data').postMessage('changed');
    ============================================================ */
+
+const POLL_INTERVAL_MS = 8000;
 
 let salesStats = { totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, topCategory: '—' };
 let topProducts = [];
@@ -14,8 +29,33 @@ let itemsOrdered = [];
 let deliveryHistory = [];
 let reportSummaries = [];
 
-function fmt(n){ return '$' + Number(n || 0).toFixed(2); }
+// live-refresh state
+let appliedParams = null;          // query string used for the Sales Summary fetch
+let reportsAbort = null;           // AbortController of the in-flight /reports/data request
+let headerAbort = null;            // AbortController of the in-flight /reports/summary request
+let lastReportsSig = '';
+let lastHeaderSig = '';
+let openReportKeys = new Set();    // dates of expanded daily summary cards
+let openStateInitialized = false;
 
+function fmt(n){ return '₱' + Number(n || 0).toFixed(2); }
+
+function esc(v){
+    return String(v ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+function slug(v){
+    return String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+const FETCH_OPTS = {
+    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    cache: 'no-store',
+};
+
+/* ---------------- RENDER: DAILY SUMMARIES ---------------- */
 function renderReportSummaries(){
     const list = document.getElementById('reportSummaryList');
     if (!list) return;
@@ -25,35 +65,44 @@ function renderReportSummaries(){
         return;
     }
 
-    list.innerHTML = reportSummaries.map((report, index) => `
-        <div class="report-summary-card ${index === 0 ? 'open' : ''}">
+    // First render for a given filter: open the newest card. After that,
+    // keep whatever the user has expanded.
+    if (!openStateInitialized) {
+        openReportKeys = new Set([String(reportSummaries[0].date)]);
+        openStateInitialized = true;
+    }
+
+    list.innerHTML = reportSummaries.map((report, index) => {
+        const isOpen = openReportKeys.has(String(report.date));
+        return `
+        <div class="report-summary-card ${isOpen ? 'open' : ''}" data-report-key="${esc(report.date)}">
             <button type="button" class="report-summary-header" data-report-index="${index}">
                 <div>
-                    <div class="report-date">${report.date}</div>
-                    <div class="report-meta">Generated ${report.generatedAt}</div>
+                    <div class="report-date">${esc(report.date)}</div>
+                    <div class="report-meta">Generated ${esc(report.generatedAt)}</div>
                 </div>
                 <div class="report-kpis">
-                    <span><strong>${report.totalOrders}</strong> Orders</span>
+                    <span><strong>${esc(report.totalOrders)}</strong> Orders</span>
                     <span><strong>${fmt(report.totalSales)}</strong> Sales</span>
-                    <span><strong>${report.totalDeliveries}</strong> Delivered</span>
+                    <span><strong>${esc(report.totalDeliveries)}</strong> Delivered</span>
                 </div>
-                <span class="report-toggle-icon">${index === 0 ? '−' : '+'}</span>
+                <span class="report-toggle-icon">${isOpen ? '−' : '+'}</span>
             </button>
             <div class="report-summary-body">
                 <div class="summary-grid">
                     <div class="summary-tile"><div class="summary-tile-label">Revenue</div><div class="summary-tile-value orange">${fmt(report.totalSales)}</div></div>
-                    <div class="summary-tile"><div class="summary-tile-label">Orders</div><div class="summary-tile-value">${report.totalOrders}</div></div>
-                    <div class="summary-tile"><div class="summary-tile-label">Items Sold</div><div class="summary-tile-value blue">${report.totalItemsSold}</div></div>
-                    <div class="summary-tile"><div class="summary-tile-label">Deliveries</div><div class="summary-tile-value green">${report.totalDeliveries}</div></div>
-                    <div class="summary-tile"><div class="summary-tile-label">Dispatches</div><div class="summary-tile-value">${report.totalDispatches ?? 0}</div></div>
-                    <div class="summary-tile"><div class="summary-tile-label">Low Stock</div><div class="summary-tile-value">${report.lowStockItemCount ?? 0}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Orders</div><div class="summary-tile-value">${esc(report.totalOrders)}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Items Sold</div><div class="summary-tile-value blue">${esc(report.totalItemsSold)}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Deliveries</div><div class="summary-tile-value green">${esc(report.totalDeliveries)}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Dispatches</div><div class="summary-tile-value">${esc(report.totalDispatches ?? 0)}</div></div>
+                    <div class="summary-tile"><div class="summary-tile-label">Low Stock</div><div class="summary-tile-value">${esc(report.lowStockItemCount ?? 0)}</div></div>
                 </div>
                 <div class="detail-list">
                     <div class="detail-panel">
                         <h4>Dispatches</h4>
                         <div class="detail-items">
                             ${report.dispatches && report.dispatches.length ? report.dispatches.map(d => `
-                                <div class="detail-item"><span>#${d.DispatchID} · ${d.Status}</span><span>${d.DispatchDate ? new Date(d.DispatchDate).toLocaleDateString() : '—'}</span></div>
+                                <div class="detail-item"><span>#${esc(d.DispatchID)} · ${esc(d.Status)}</span><span>${d.DispatchDate ? esc(new Date(d.DispatchDate).toLocaleDateString()) : '—'}</span></div>
                             `).join('') : '<div class="detail-item"><span>No dispatches</span><span>—</span></div>'}
                         </div>
                     </div>
@@ -61,31 +110,42 @@ function renderReportSummaries(){
                         <h4>Deliveries</h4>
                         <div class="detail-items">
                             ${report.deliveries && report.deliveries.length ? report.deliveries.map(d => `
-                                <div class="detail-item"><span>#${d.DeliveryID} · ${d.Status}</span><span>${d.DeliveryDate ? new Date(d.DeliveryDate).toLocaleDateString() : '—'}</span></div>
+                                <div class="detail-item"><span>#${esc(d.DeliveryID)} · ${esc(d.Status)}</span><span>${d.DeliveryDate ? esc(new Date(d.DeliveryDate).toLocaleDateString()) : '—'}</span></div>
                             `).join('') : '<div class="detail-item"><span>No deliveries</span><span>—</span></div>'}
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
+}
 
-    document.querySelectorAll('.report-summary-header').forEach(button => {
-        button.addEventListener('click', () => {
-            const card = button.closest('.report-summary-card');
-            const isOpen = card.classList.contains('open');
-            document.querySelectorAll('.report-summary-card').forEach(item => {
-                item.classList.remove('open');
-                const icon = item.querySelector('.report-toggle-icon');
-                if (icon) icon.textContent = '+';
-            });
+/* One delegated click handler (survives re-renders) — accordion: one open at a time */
+function bindSummaryToggle(){
+    const list = document.getElementById('reportSummaryList');
+    if (!list) return;
 
-            if (!isOpen) {
-                card.classList.add('open');
-                const icon = card.querySelector('.report-toggle-icon');
-                if (icon) icon.textContent = '−';
-            }
+    list.addEventListener('click', (e) => {
+        const button = e.target.closest('.report-summary-header');
+        if (!button) return;
+
+        const card = button.closest('.report-summary-card');
+        const key = card.dataset.reportKey;
+        const wasOpen = card.classList.contains('open');
+
+        list.querySelectorAll('.report-summary-card').forEach(item => {
+            item.classList.remove('open');
+            const icon = item.querySelector('.report-toggle-icon');
+            if (icon) icon.textContent = '+';
         });
+        openReportKeys.clear();
+
+        if (!wasOpen) {
+            card.classList.add('open');
+            const icon = card.querySelector('.report-toggle-icon');
+            if (icon) icon.textContent = '−';
+            openReportKeys.add(key);
+        }
     });
 }
 
@@ -109,8 +169,8 @@ function renderTopProducts(){
         return `
         <div class="top-product-row">
             <div class="tp-top">
-                <span class="tp-name">${p.name}</span>
-                <span class="tp-value">${p.unitsSold} sold</span>
+                <span class="tp-name">${esc(p.name)}</span>
+                <span class="tp-value">${esc(p.unitsSold)} sold</span>
             </div>
             <div class="tp-bar">
                 ${Array.from({length: segCount}).map((_, i) => `<div class="tp-seg ${i < filled ? 'filled' : ''}"></div>`).join('')}
@@ -127,12 +187,12 @@ function renderRecentSales(){
     }
     body.innerHTML = recentSales.map(s => `
         <tr>
-            <td class="cell-dim">${s.id}</td>
-            <td>${s.customer}</td>
-            <td class="cell-dim">${s.items} item${s.items > 1 ? 's' : ''}</td>
+            <td class="cell-dim">${esc(s.id)}</td>
+            <td>${esc(s.customer)}</td>
+            <td class="cell-dim">${esc(s.items)} item${s.items > 1 ? 's' : ''}</td>
             <td class="cell-total">${fmt(s.total)}</td>
-            <td><span class="badge payment-${s.payment.toLowerCase().replace(/\s+/g,'-')}">${s.payment}</span> <span class="badge status-${s.paymentStatus.toLowerCase()}">${s.paymentStatus}</span></td>
-            <td class="cell-dim">${s.date}</td>
+            <td><span class="badge payment-${slug(s.payment)}">${esc(s.payment)}</span> <span class="badge status-${slug(s.paymentStatus)}">${esc(s.paymentStatus)}</span></td>
+            <td class="cell-dim">${esc(s.date)}</td>
         </tr>`).join('');
 }
 
@@ -146,9 +206,9 @@ function renderItemsOrdered(){
     }
     body.innerHTML = itemsOrdered.map(i => `
         <tr>
-            <td>${i.name}</td>
-            <td class="cell-dim">${i.category}</td>
-            <td class="cell-dim">${i.unitsSold}</td>
+            <td>${esc(i.name)}</td>
+            <td class="cell-dim">${esc(i.category)}</td>
+            <td class="cell-dim">${esc(i.unitsSold)}</td>
             <td class="cell-total">${fmt(i.revenue)}</td>
         </tr>`).join('');
 }
@@ -156,7 +216,9 @@ function renderItemsOrdered(){
 /* ---------------- RENDER: DELIVERY HISTORY ---------------- */
 function badgeForDeliveryStatus(status){
     const map = { transit:'TRANSIT', delivered:'DELIVERED', returned:'RETURNED' };
-    return `<span class="badge ${status}">${map[status] || status.toUpperCase()}</span>`;
+    const key = slug(status);
+    const label = map[key] || (String(status ?? '').trim() ? String(status).toUpperCase() : '—');
+    return `<span class="badge ${key}">${esc(label)}</span>`;
 }
 
 function renderDeliveryHistory(){
@@ -167,13 +229,13 @@ function renderDeliveryHistory(){
     }
     body.innerHTML = deliveryHistory.map(d => `
         <tr>
-            <td class="cell-dim">${d.id}</td>
-            <td>${d.customer}</td>
-            <td class="cell-dim">${d.truck} &middot; ${d.driver}</td>
+            <td class="cell-dim">${esc(d.id)}</td>
+            <td>${esc(d.customer)}</td>
+            <td class="cell-dim">${esc(d.truck)} &middot; ${esc(d.driver)}</td>
             <td>${badgeForDeliveryStatus(d.status)}</td>
-            <td class="cell-dim">${d.dispatched}</td>
-            <td class="cell-dim">${d.delivered}</td>
-            <td><span class="badge payment-${d.payment.toLowerCase().replace(/\s+/g,'-')}">${d.payment}</span></td>
+            <td class="cell-dim">${esc(d.dispatched)}</td>
+            <td class="cell-dim">${esc(d.delivered)}</td>
+            <td>${d.payment ? `<span class="badge payment-${slug(d.payment)}">${esc(d.payment)}</span>` : '—'}</td>
         </tr>`).join('');
 }
 
@@ -229,18 +291,34 @@ function toggleReportTypePanels(){
     }
 }
 
-/* ---------------- FETCH: FILTERED REPORT DATA (Sales Summary section) ---------------- */
-async function fetchReportsData(){
+/* ---------------- FETCH: FILTERED REPORT DATA (Sales Summary section) ----------------
+   force = true  -> user action: cancel any in-flight request and fetch now
+   force = false -> poll: skipped if a request is already running            */
+async function fetchReportsData({ force = false } = {}){
+    if (reportsAbort && !force) return;
+    if (reportsAbort) reportsAbort.abort();
+
+    if (!appliedParams) appliedParams = currentFilterParams().toString();
+
+    const ctrl = new AbortController();
+    reportsAbort = ctrl;
+
     try {
-        const res = await fetch(`/reports/data?${currentFilterParams()}`);
+        const res = await fetch(`/reports/data?${appliedParams}`, { ...FETCH_OPTS, signal: ctrl.signal });
         if(!res.ok) throw new Error('Failed to load report data');
         const data = await res.json();
 
+        if (ctrl !== reportsAbort) return; // superseded by a newer request
+
+        const sig = JSON.stringify(data);
+        if (sig === lastReportsSig) return; // nothing changed — leave the DOM alone
+        lastReportsSig = sig;
+
         salesStats = data.salesStats;
-        topProducts = data.topProducts;
-        recentSales = data.recentSales;
+        topProducts = data.topProducts || [];
+        recentSales = data.recentSales || [];
         itemsOrdered = data.itemsOrdered || [];
-        deliveryHistory = data.deliveryHistory;
+        deliveryHistory = data.deliveryHistory || [];
         reportSummaries = data.reportSummaries || [];
 
         renderSalesStats();
@@ -251,8 +329,18 @@ async function fetchReportsData(){
         renderReportSummaries();
         toggleReportTypePanels();
     } catch (err) {
-        console.error(err);
+        if (err.name !== 'AbortError') console.error(err);
+    } finally {
+        if (reportsAbort === ctrl) reportsAbort = null;
     }
+}
+
+/* Apply the filter dropdowns as the new "current period" and load it now. */
+function applyFiltersAndFetch(){
+    appliedParams = currentFilterParams().toString();
+    lastReportsSig = '';
+    openStateInitialized = false; // new period -> open the newest daily card again
+    return fetchReportsData({ force: true });
 }
 
 /* ---------------- FETCH: HEADER SUMMARY (own month/year picker) ---------------- */
@@ -263,17 +351,53 @@ function currentHeaderParams(){
     });
 }
 
-async function fetchHeaderSummary(){
+async function fetchHeaderSummary({ force = false } = {}){
+    if (headerAbort && !force) return;
+    if (headerAbort) headerAbort.abort();
+
+    const ctrl = new AbortController();
+    headerAbort = ctrl;
+
     try {
-        const res = await fetch(`/reports/summary?${currentHeaderParams()}`);
+        const res = await fetch(`/reports/summary?${currentHeaderParams()}`, { ...FETCH_OPTS, signal: ctrl.signal });
         if(!res.ok) throw new Error('Failed to load summary');
         const data = await res.json();
+
+        if (ctrl !== headerAbort) return;
+
+        const sig = JSON.stringify(data);
+        if (sig === lastHeaderSig) return;
+        lastHeaderSig = sig;
 
         document.getElementById('statTotalRevenue').textContent = fmt(data.totalRevenue);
         document.getElementById('statTotalOrders').textContent = data.totalOrders;
         document.getElementById('statAvgOrder').textContent = fmt(data.avgOrderValue);
     } catch (err) {
-        console.error(err);
+        if (err.name !== 'AbortError') console.error(err);
+    } finally {
+        if (headerAbort === ctrl) headerAbort = null;
+    }
+}
+
+/* ---------------- LIVE POLLING ---------------- */
+function pollOnce(){
+    if (document.hidden) return;
+    fetchReportsData();
+    fetchHeaderSummary();
+}
+
+function startPolling(){
+    setInterval(pollOnce, POLL_INTERVAL_MS);
+
+    // catch up immediately when the user comes back to this tab
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) pollOnce();
+    });
+
+    // instant refresh when another tab/page in this browser announces a change
+    if ('BroadcastChannel' in window) {
+        const channel = new BroadcastChannel('ocampo-data');
+        channel.addEventListener('message', pollOnce);
     }
 }
 
@@ -282,7 +406,7 @@ function buildExportUrl(base){
     return `${base}?${currentFilterParams()}`;
 }
 
-document.getElementById('btnGenerateReport').addEventListener('click', fetchReportsData);
+document.getElementById('btnGenerateReport').addEventListener('click', applyFiltersAndFetch);
 document.getElementById('btnExportPdf').addEventListener('click', () => {
     window.location.href = buildExportUrl('/reports/export/pdf');
 });
@@ -294,7 +418,7 @@ const filterReportTypeEl = document.getElementById('filterReportType');
 if(filterReportTypeEl){
     filterReportTypeEl.addEventListener('change', () => {
         toggleReportTypePanels();
-        fetchReportsData();
+        applyFiltersAndFetch();
     });
 }
 
@@ -304,19 +428,18 @@ if(filterReportTypeEl){
    period — one picker driving the whole dashboard, no button needed. */
 const headerMonthEl = document.getElementById('headerMonth');
 const headerYearEl = document.getElementById('headerYear');
+
+function onHeaderPickerChange(){
+    document.getElementById('filterMonth').value = headerMonthEl.value;
+    document.getElementById('filterYear').value = headerYearEl.value;
+    lastHeaderSig = '';
+    fetchHeaderSummary({ force: true });
+    applyFiltersAndFetch();
+}
+
 if(headerMonthEl && headerYearEl){
-    headerMonthEl.addEventListener('change', () => {
-        document.getElementById('filterMonth').value = headerMonthEl.value;
-        document.getElementById('filterYear').value = headerYearEl.value;
-        fetchHeaderSummary();
-        fetchReportsData();
-    });
-    headerYearEl.addEventListener('change', () => {
-        document.getElementById('filterMonth').value = headerMonthEl.value;
-        document.getElementById('filterYear').value = headerYearEl.value;
-        fetchHeaderSummary();
-        fetchReportsData();
-    });
+    headerMonthEl.addEventListener('change', onHeaderPickerChange);
+    headerYearEl.addEventListener('change', onHeaderPickerChange);
 }
 
 /* ---------------- TABS ---------------- */
@@ -347,7 +470,7 @@ populateYearOptions(document.getElementById('filterYear'));
 document.getElementById('filterMonth').value = today.getMonth() + 1;
 document.getElementById('filterYear').value = today.getFullYear();
 
-// Header picker (new) — defaults to current month/year on load
+// Header picker — defaults to current month/year on load
 if(headerMonthEl && headerYearEl){
     populateMonthOptions(headerMonthEl);
     populateYearOptions(headerYearEl);
@@ -355,6 +478,8 @@ if(headerMonthEl && headerYearEl){
     headerYearEl.value = today.getFullYear();
 }
 
+bindSummaryToggle();
 toggleReportTypePanels();
-fetchReportsData();
-fetchHeaderSummary();
+applyFiltersAndFetch();
+fetchHeaderSummary({ force: true });
+startPolling();

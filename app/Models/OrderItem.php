@@ -64,6 +64,22 @@ class OrderItem extends Model
         return $query->where('Status', self::STATUS_PENDING);
     }
 
+    public function scopeAwaitingDispatch($query)
+    {
+        return $query->whereRaw(
+            'CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID AND dispatches.Status != ?)',
+            ['Failed']
+        );
+    }
+
+    public static function awaitingDispatchOrderCount(): int
+    {
+        return static::query()
+            ->awaitingDispatch()
+            ->distinct()
+            ->count('OrderID');
+    }
+
     public function scopeInProgress($query){
         return $query->where('Status', self::STATUS_IN_PROGRESS);
     }

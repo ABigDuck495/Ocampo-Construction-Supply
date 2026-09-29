@@ -64,7 +64,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
                 </span>
             </div>
-            <div class="stat-value">₱<span data-count="{{ $todayRevenue }}" data-decimals="2">{{ number_format($todayRevenue, 2) }}</span></div>
+            <div class="stat-value">₱<span data-count="{{ $todayRevenue }}" data-decimals="2" data-live-revenue data-revenue-url="{{ route('homepage.revenue') }}">{{ number_format($todayRevenue, 2) }}</span></div>
             <div class="stat-foot">
                 @if(!is_null($revenueDelta))
                     <span class="delta {{ $revenueDelta >= 0 ? 'up' : 'down' }}">{{ $revenueDelta >= 0 ? '▲' : '▼' }} {{ abs($revenueDelta) }}%</span> vs yesterday
@@ -172,10 +172,14 @@
                 @forelse($pendingOrders as $order)
                     <div class="row-item">
                         <div class="row-main">
-                            <div class="row-title">#{{ $order->id }} · {{ $order->customer_name ?? 'Walk-in' }}</div>
-                            <div class="row-meta">{{ optional($order->created_at)->diffForHumans() }}</div>
+                            <div class="row-title">#{{ $order->OrderID }} · {{ $order->CustomerName ?? 'Walk-in' }}</div>
+                            <div class="row-meta">
+                                {{ $order->PaymentStatus ?? 'Status unavailable' }} · {{ $order->transactions?->PaymentMethod ?? 'Method unavailable' }} · {{ $order->OrderDate ? \Illuminate\Support\Carbon::parse($order->OrderDate)->diffForHumans() : '—' }}
+                            </div>
                         </div>
-                        <div class="row-amount">₱{{ number_format($order->total ?? 0, 2) }}</div>
+                        <div class="row-amount">
+                            ₱{{ number_format($order->totalAmount(), 2) }}
+                        </div>
                     </div>
                 @empty
                     <div class="empty">NO PENDING ORDERS</div>
@@ -191,16 +195,16 @@
             <div class="panel-body">
                 @forelse($lowStockItems as $item)
                     @php
-                        $min = max((int) ($item->min_stock ?? 0), 1);
-                        $pct = min(100, round(((int) ($item->stock ?? 0) / $min) * 100));
+                        $min = max((int) $item->ReorderLevel, 1);
+                        $pct = min(100, round(((int) $item->QuantityOnHand / $min) * 100));
                     @endphp
                     <div class="row-item">
                         <div class="row-main">
-                            <div class="row-title">{{ $item->name }}</div>
+                            <div class="row-title">{{ $item->product?->Product_Name ?? 'Unknown product' }}</div>
                             <div class="stock-bar"><span style="width: {{ $pct }}%"></span></div>
                         </div>
-                        <div class="row-amount stock-qty {{ ($item->stock ?? 0) <= 0 ? 'out' : '' }}">
-                            {{ ($item->stock ?? 0) <= 0 ? 'OUT' : $item->stock . ' left' }}
+                        <div class="row-amount stock-qty {{ $item->QuantityOnHand <= 0 ? 'out' : '' }}">
+                            {{ $item->QuantityOnHand <= 0 ? 'OUT' : $item->QuantityOnHand . ' left' }}
                         </div>
                     </div>
                 @empty

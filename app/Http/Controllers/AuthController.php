@@ -109,7 +109,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended(
-            route('deliveries.index')
+            route('homepage.index')
         );
     }
 
