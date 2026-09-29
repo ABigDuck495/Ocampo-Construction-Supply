@@ -9,6 +9,7 @@ use App\Models\Dispatch;
 use App\Models\DispatchLog;
 use App\Models\Driver;
 use App\Models\OrderItem;
+use App\Models\SystemSetting;
 use App\Models\Truck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,9 +28,7 @@ class DeliveryController extends Controller
         $trucks = Truck::with(['dispatches.orderItem.order', 'dispatches.orderItem.product', 'dispatches.drivers'])->get();
         $drivers = Driver::all();
 
-        $systemSettings = \Illuminate\Support\Facades\DB::table('system_settings')
-            ->pluck('Setting_Value', 'Setting_Key')
-            ->toArray();
+        $systemSettings = SystemSetting::allCached();
 
         return view('deliveries.index', compact('orders', 'trucks', 'systemSettings', 'drivers'));
     }

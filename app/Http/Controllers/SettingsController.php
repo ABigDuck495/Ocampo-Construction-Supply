@@ -13,14 +13,9 @@ class SettingsController extends Controller
 {
     public function index(): View
     {
-        
         try {
             $groupedSettings = SystemSetting::grouped();
-        
-            // also expose settings map to JS like other pages
-            $systemSettings = \Illuminate\Support\Facades\DB::table('System_Settings')
-                ->pluck('Setting_Value', 'Setting_Key')
-                ->toArray();
+            $systemSettings = SystemSetting::allCached();
 
             return view('settings.index', [
                 'groupedSettings' => $groupedSettings,
@@ -29,16 +24,22 @@ class SettingsController extends Controller
         } catch (\Throwable $e) {
             Log::error('Settings page failed: ' . $e->getMessage(), ['exception' => $e]);
 
-            // Return the view with an empty collection and show a user-friendly message
             return view('settings.index', [
                 'groupedSettings' => collect(),
             ])->with('status', 'Could not load system settings (see logs).');
         }
     }
 
+    public function store(Request $request): RedirectResponse
+    {
+        return $this->update($request);
+    }
+
     public function update(Request $request): RedirectResponse
     {
-        $allSettings = SystemSetting::query()->get()->keyBy('setting_key');
+        $allSettings = SystemSetting::query()
+            ->get()
+            ->keyBy(fn (SystemSetting $setting) => SystemSetting::normalizeKey($setting->Setting_Key));
 
         $submitted = (array) $request->input('settings', []);
 

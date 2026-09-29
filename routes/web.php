@@ -98,7 +98,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('users/{user}/activity', [UserController::class, 'activity'])->name('users.activity');
         Route::put('inventories/{inventory}/update-with-product', [InventoryController::class, 'updateWithProduct'])->name('inventory.updateWithProduct');
     });
-        Route::resource('settings', SettingsController::class);
+        Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::post('settings', [SettingsController::class, 'update'])->name('settings.store');
+        Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::patch('settings', [SettingsController::class, 'update'])->name('settings.patch');
         Route::resource('printers', PrinterController::class)->except(['show', 'edit', 'create']);
         Route::post('/api/print-receipt', [PrinterController::class, 'printReceipt'])->name('print-receipt');
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

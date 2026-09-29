@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SystemSetting;
 use Illuminate\Support\Facades\DB;
 
 class SystemSettings
@@ -10,30 +11,50 @@ class SystemSettings
 
     public function __construct()
     {
-        // load and cache settings as key => value
-        $this->settings = DB::table('System_Settings')->pluck('Setting_Value', 'Setting_Key')->toArray();
+        $this->settings = DB::table('System_Settings')
+            ->get()
+            ->reduce(function (array $carry, $row) {
+                $key = SystemSetting::normalizeKey($row->Setting_Key ?? null);
+                if ($key === null) {
+                    return $carry;
+                }
+
+                $carry[$key] = SystemSetting::castValue($row->Setting_Value ?? null);
+                return $carry;
+            }, []);
     }
 
     public function isEnabled(string $key): bool
     {
-        $v = $this->settings[$key] ?? null;
-        if (is_null($v)) return false;
+        $normalizedKey = SystemSetting::normalizeKey($key);
+        $v = $this->settings[$normalizedKey] ?? null;
+
+        if (is_null($v)) {
+            return false;
+        }
+
         if (is_string($v)) {
             $lv = strtolower(trim($v));
             return in_array($lv, ['1', 'true', 'on', 'yes'], true);
         }
+
         return (bool) $v;
     }
 
     public function get(string $key, $default = null)
     {
-        return $this->settings[$key] ?? $default;
+        $normalizedKey = SystemSetting::normalizeKey($key);
+
+        return $this->settings[$normalizedKey] ?? $default;
     }
 
     public function getFloat(string $key, float $default = 0.0): float
     {
         $val = $this->get($key, $default);
-        if (is_null($val)) return $default;
+        if (is_null($val)) {
+            return $default;
+        }
+
         return (float) str_replace(',', '.', (string) $val);
     }
 

@@ -65,7 +65,7 @@
             </div>
         @endif
 
-        <form id="settingsForm" method="POST" action="{{ url('/settings') }}">
+        <form id="settingsForm" method="POST" action="{{ route('settings.update') }}">
             @csrf
             @method('PUT')
 

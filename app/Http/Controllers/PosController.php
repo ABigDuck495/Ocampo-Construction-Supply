@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\SystemSetting;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,25 +13,16 @@ use Illuminate\Support\Facades\DB;
 class PosController extends Controller
 {
     public function index(){
-        // FIX: inventory relation must be eager-loaded, otherwise
-        // window.POS_DATA.products has no `inventory` key at all and
-        // pos.js's `p.inventory ? Number(p.inventory.QuantityOnHand) : 0`
-        // always falls back to 0.
         $products = Product::with('inventory')->get();
-        $systemSettings = 
-            DB::table('system_settings')
-                ->pluck('Setting_Value', 'Setting_Key')
-                ->toArray();
+        $systemSettings = SystemSetting::allCached();
 
         return view('pos.index', compact('products', 'systemSettings'));
     }
 
     public function posSale(Request $request){
-        $systemSettings = DB::table('system_settings')
-                ->pluck('Setting_Value', 'Setting_Key')
-                ->toArray();
+        $systemSettings = SystemSetting::allCached();
 
-        $allowUnresolved = ($systemSettings['allow_unresolved_price_checkout'] ?? 'false') === 'true';
+        $allowUnresolved = (bool) ($systemSettings['allow_unresolved_price_checkout'] ?? false);
 
         $rules = [
             'items' => 'required|array|min:1',
@@ -55,7 +47,7 @@ class PosController extends Controller
 
         $isPickup = $validated['OrderType'] === 'Pickup';
 
-        $inventoryTrackingEnabled = ($systemSettings['enable_inventory_tracking'] ?? 'true') === 'true';
+        $inventoryTrackingEnabled = (bool) ($systemSettings['enable_inventory_tracking'] ?? true);
 
         return DB::transaction(function () use ($validated, $isPickup) {
             foreach ($validated['items'] as $item) {
