@@ -240,6 +240,15 @@ body{
 .tc-name svg{width:15px;height:15px;color:var(--text-dim);}
 .tc-driver{font-size:10.5px;color:var(--text-dim);margin-top:1px;}
 
+.tc-details-btn{
+    flex:0 0 auto;display:flex;align-items:center;gap:6px;
+    background:var(--panel-alt);border:1px solid var(--border);color:var(--text);
+    font:700 9px 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.04em;
+    padding:6px 8px;cursor:pointer;
+}
+.tc-details-btn:hover{border-color:var(--orange);color:var(--orange);}
+.tc-details-btn svg{width:13px;height:13px;}
+
 .cargo-label{display:flex;justify-content:space-between;font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-dim);margin-bottom:4px;}
 .cargo-label b{color:var(--orange);}
 .cargo-bar{display:flex;gap:2px;height:14px;}

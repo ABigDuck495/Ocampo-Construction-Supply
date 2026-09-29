@@ -149,13 +149,12 @@ class InventoryController extends Controller
 
     /**
      * Update the Product's own fields (name/SKU/category/subcategory/price)
-     * AND its Inventory row (reorder level only) together — the
+    * AND its Inventory row (reorder level and stock increase) together — the
      * counterpart to storeWithProduct(), used by the inventory page's
      * EDIT button/modal.
      *
-     * QuantityOnHand is intentionally NOT accepted here — stock can only
-     * be changed via adjust() (Restock/Correction/Damage transactions),
-     * never through a direct product edit.
+    * StockIncrease can only add to QuantityOnHand; the current quantity
+    * cannot be replaced or reduced through this product edit.
      */
     public function updateWithProduct(Request $request, Inventory $inventory)
     {
@@ -168,6 +167,7 @@ class InventoryController extends Controller
             'Price'          => 'nullable|numeric|min:0',
             'Pricing_type'   => ['nullable', 'string'],
             'ReorderLevel'   => 'nullable|integer|min:0',
+            'StockIncrease'  => 'sometimes|integer|min:0',
         ]);
 
         return DB::transaction(function () use ($validated, $inventory) {
@@ -188,6 +188,11 @@ class InventoryController extends Controller
             $inventory->update([
                 'ReorderLevel' => $validated['ReorderLevel'] ?? $inventory->ReorderLevel,
             ]);
+
+            $stockIncrease = (int) ($validated['StockIncrease'] ?? 0);
+            if ($stockIncrease > 0) {
+                $inventory->increment('QuantityOnHand', $stockIncrease);
+            }
 
             return $inventory->fresh()->load('product');
         });

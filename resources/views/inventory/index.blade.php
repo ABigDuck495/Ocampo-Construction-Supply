@@ -206,6 +206,12 @@
                             <input type="number" id="editFldReorderLevel" name="ReorderLevel" min="0">
                         </div>
                     <div class="form-row">
+                        <label for="editFldStockIncrease">Add to Current Stock</label>
+                        <div>Available now: <strong id="editCurrentStock">0</strong></div>
+                        <input type="number" id="editFldStockIncrease" min="0" step="1" value="0">
+                        <small>Enter the quantity to add. Available stock cannot be reduced here.</small>
+                    </div>
+                    <div class="form-row">
                         <label class="toggle-row" for="editFldVariablePricing">
                             <input type="checkbox" id="editFldVariablePricing" name="Pricing_type" value="Variable">
                             <span class="toggle-switch" aria-hidden="true"></span>

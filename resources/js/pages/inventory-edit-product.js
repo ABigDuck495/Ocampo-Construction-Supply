@@ -6,10 +6,8 @@
 // the form — no extra fetch needed since that data is already on the page.
 //
 // PUTs to InventoryController@updateWithProduct, which updates the
-// Product row (name/sku/category/subcategory/price/unit/reorder level).
-// QuantityOnHand is intentionally NOT editable here — stock can only be
-// changed by recording a transaction (sale, delivery, restock, etc.),
-// never by direct edit.
+// Product row (name/sku/category/subcategory/price/unit/reorder level) and
+// allows adding to QuantityOnHand without replacing or reducing current stock.
 //
 // Response shape (Inventory model with product loaded):
 // {
@@ -25,6 +23,8 @@
     const submitBtn = document.getElementById('editModalSubmitBtn');
     const errorBox = document.getElementById('editModalFormError');
     const productBody = document.getElementById('productBody');
+    const currentStock = document.getElementById('editCurrentStock');
+    const stockIncreaseInput = document.getElementById('editFldStockIncrease');
 
     if (!modal || !form || !productBody) return; // page markup not present, bail quietly
 
@@ -43,6 +43,8 @@
         document.getElementById('editFldPrice').value = btn.dataset.price || '';
         document.getElementById('editFldVariablePricing').checked = (btn.dataset.pricingType || 'Fixed') === 'Variable';
         document.getElementById('editFldReorderLevel').value = btn.dataset.reorderLevel || '';
+        currentStock.textContent = btn.dataset.stock || '0';
+        stockIncreaseInput.value = '0';
 
         errorBox.classList.remove('show');
         errorBox.textContent = '';
@@ -70,11 +72,6 @@
         if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
     });
 
-    // Note: QuantityOnHand/stock is deliberately left untouched here.
-    // The PUT response still contains the current QuantityOnHand (unchanged
-    // by this endpoint), so the stock pill is refreshed from that value
-    // purely to stay in sync with ReorderLevel edits, not because stock
-    // itself was modified.
     function updateRowInPlace(inventory) {
         const row = productBody.querySelector(`tr[data-inventory-id="${inventory.InventoryID}"]`);
         if (!row) return;
@@ -105,9 +102,7 @@
         editBtn.dataset.price = product.Price ?? '';
         editBtn.dataset.pricingType = product.Pricing_type ?? 'Fixed';
         editBtn.dataset.reorderLevel = inventory.ReorderLevel;
-        // NOTE: editBtn.dataset.stock is intentionally left as-is —
-        // it's not part of this form anymore and stays whatever the
-        // transaction system last set it to.
+        editBtn.dataset.stock = String(qty);
     }
 
     form.addEventListener('submit', async (e) => {
@@ -122,6 +117,7 @@
             Price: document.getElementById('editFldPrice').value || null,
             Pricing_type: document.getElementById('editFldVariablePricing').checked ? 'Variable' : 'Fixed',
             ReorderLevel: document.getElementById('editFldReorderLevel').value || undefined,
+            StockIncrease: stockIncreaseInput.value || '0',
         };
 
         submitBtn.disabled = true;

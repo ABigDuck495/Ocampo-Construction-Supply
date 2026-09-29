@@ -92,6 +92,7 @@ function mapTrucks(list) {
                 orderLabel: 'ORD-' + (orderItem.OrderID ?? order.OrderID ?? '—'),
                 customer: order.CustomerName || 'Unknown',
                 address: order.Address || '',
+                driver: d.drivers?.find(driver => driver.pivot?.Role === 'Driver')?.Name || '—',
                 itemName: orderItem.product?.Product_Name || 'Item',
                 qty: Number(d.QuantityDispatched) || 0,
                 acceptedAt: d.AcceptedAt || null,
@@ -362,6 +363,7 @@ function renderTrucks(){
                     <div class="tc-name">${svg.truck} ${truck.name} ${statusBadgeClass ? `<span class="badge ${statusBadgeClass}">${statusLabel}</span>` : `<span class="badge" style="color:var(--text-dim)">${statusLabel}</span>`}</div>
                     <div class="tc-driver">${truck.driver}${truck.boardmate ? ' + ' + truck.boardmate : ''} &middot; ${truck.plate}</div>
                 </div>
+                <button class="tc-details-btn" type="button" onclick="showTruckDetails('${truck.id}')">${svg.eye} DETAILS</button>
             </div>
             <div>
                 <div class="cargo-label"><span>CARGO</span><b>${cargo}/${truck.capacity}</b></div>
@@ -418,6 +420,95 @@ function groupDispatchesByOrder(dispatches) {
         map.get(key).items.push(d);
     });
     return Array.from(map.values());
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+    })[character]);
+}
+
+function showTruckDetails(truckId) {
+    const truck = trucks.find(item => String(item.id) === String(truckId));
+    if (!truck) return;
+
+    const groupsByOrder = new Map();
+    (truck.activeDispatches || []).forEach(dispatch => {
+        const key = `${dispatch.orderLabel}_${dispatch.customer}`;
+        if (!groupsByOrder.has(key)) {
+            groupsByOrder.set(key, {
+                orderLabel: dispatch.orderLabel,
+                customer: dispatch.customer,
+                address: dispatch.address,
+                drivers: [],
+                statuses: [],
+                items: [],
+            });
+        }
+        const group = groupsByOrder.get(key);
+        group.items.push(dispatch);
+        if (dispatch.driver && dispatch.driver !== '—' && !group.drivers.includes(dispatch.driver)) group.drivers.push(dispatch.driver);
+        if (dispatch.status && !group.statuses.includes(dispatch.status)) group.statuses.push(dispatch.status);
+    });
+
+    const stagedOrders = orders.filter(order => String(order.truck) === String(truck.id) && !['delivered', 'returned'].includes(order.status));
+    stagedOrders.forEach(order => groupsByOrder.set(`staged_${order.id}`, {
+        orderLabel: order.id,
+        customer: order.customer,
+        address: order.address,
+        drivers: [],
+        statuses: ['Not dispatched'],
+        items: order.items.map(item => ({ itemName: item.name, qty: item.qty })),
+    }));
+
+    const truckStatus = {
+        idle: 'Idle',
+        loading: 'Loading',
+        transit: 'On Route',
+        maintenance: 'Maintenance',
+        delivered: 'Delivered',
+    }[truck.status] || truck.status;
+    const groups = Array.from(groupsByOrder.values());
+    const groupsHtml = groups.length ? groups.map(group => `
+        <section class="doa-delivery-group">
+            <div class="doa-delivery-order">${escapeHtml(group.orderLabel)}</div>
+            <div class="doa-delivery-fields">
+                <div><b>CUSTOMER</b><span>${escapeHtml(group.customer || 'Unknown')}</span></div>
+                <div><b>ADDRESS</b><span>${escapeHtml(group.address || '—')}</span></div>
+                <div><b>DRIVER</b><span>${escapeHtml(group.drivers.join(', ') || truck.driver || '—')}</span></div>
+                <div><b>TRUCK</b><span>${escapeHtml(truck.name || '—')}</span></div>
+                <div><b>ORDER CODE</b><span>${escapeHtml(group.orderLabel)}</span></div>
+                <div><b>STATUS</b><span>${escapeHtml(group.statuses.join(', ') || truckStatus)}</span></div>
+            </div>
+            <div class="doa-delivery-items">
+                ${group.items.map(item => `<div><span>${escapeHtml(item.itemName || 'Item')}</span><b>${escapeHtml(item.qty)}×</b></div>`).join('')}
+            </div>
+        </section>
+    `).join('') : '<div class="doa-modal-sub">No active delivery orders assigned to this truck.</div>';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'doa-modal-overlay';
+    overlay.innerHTML = `
+        <div class="doa-modal-box doa-delivery-modal" role="dialog" aria-modal="true" aria-labelledby="truckDetailsTitle">
+            <div class="doa-modal-head">
+                <div id="truckDetailsTitle">DELIVERY DETAILS &middot; ${escapeHtml(truck.name || 'TRUCK')}</div>
+                <button class="doa-modal-x" type="button" aria-label="Close details">${svg.x}</button>
+            </div>
+            <div class="doa-delivery-truck-status">TRUCK STATUS <b>${escapeHtml(truckStatus)}</b></div>
+            <div class="doa-delivery-groups">${groupsHtml}</div>
+        </div>`;
+    document.body.appendChild(overlay);
+    injectAssignModalStyles();
+
+    const close = () => overlay.remove();
+    overlay.querySelector('.doa-modal-x').addEventListener('click', close);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    overlay.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+    overlay.querySelector('.doa-modal-x').focus();
 }
 
 function renderDispatchLog(){
@@ -505,6 +596,20 @@ function injectAssignModalStyles(){
         .doa-log-notes{color:#6b6258;flex:1;}
         .doa-log-group-title{font-weight:800;font-size:11px;letter-spacing:.4px;margin:14px 0 4px;color:#e0592a;}
         .doa-log-group-title:first-child{margin-top:0;}
+        .doa-delivery-modal{width:min(640px,100%);}
+        .doa-delivery-truck-status{display:flex;justify-content:space-between;gap:12px;margin:12px 0;padding:9px 10px;background:#f2ece0;border:1px solid #ddd3c2;font-size:10px;font-weight:800;}
+        .doa-delivery-truck-status b{color:#e0592a;}
+        .doa-delivery-groups{display:grid;gap:10px;}
+        .doa-delivery-group{border:1px solid #ddd3c2;padding:12px;}
+        .doa-delivery-order{font-size:12px;font-weight:800;margin-bottom:10px;color:#e0592a;}
+        .doa-delivery-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;}
+        .doa-delivery-fields div{display:grid;gap:3px;min-width:0;}
+        .doa-delivery-fields b{font-size:9px;letter-spacing:.04em;color:#93897c;}
+        .doa-delivery-fields span{font-size:11px;line-height:1.45;overflow-wrap:anywhere;}
+        .doa-delivery-items{display:grid;gap:5px;margin-top:12px;padding-top:9px;border-top:1px dashed #ddd3c2;}
+        .doa-delivery-items div{display:flex;justify-content:space-between;gap:10px;font-size:11px;}
+        .doa-delivery-items b{white-space:nowrap;}
+        @media(max-width:560px){.doa-delivery-fields{grid-template-columns:1fr;}}
     `;
     document.head.appendChild(style);
 }
@@ -1150,6 +1255,7 @@ window.cancelPendingDispatch = cancelPendingDispatch;
 window.openDeliveryConfirmModal = openDeliveryConfirmModal;
 window.markReturned = markReturned;
 window.viewDispatchLog = viewDispatchLog;
+window.showTruckDetails = showTruckDetails;
 
 // Works alongside the existing HTML5 drag-and-drop in deliveries.js.
 // It does NOT handle drops – it only (1) marks the page as "dragging"
