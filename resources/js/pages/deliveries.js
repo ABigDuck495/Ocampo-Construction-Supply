@@ -373,6 +373,10 @@ function renderTrucks(){
             </div>
             <div class="tc-orders">${ordersHtml || '<div class="dropzone-empty">No active items</div>'}</div>
             ${actionsHtml}
+            <div class="tc-admin-actions">
+                <button class="btn-ghost" onclick="openTruckModal('edit', ${truck.id})">EDIT</button>
+                <button class="btn-ghost danger" onclick="deleteTruck(${truck.id})">DELETE</button>
+            </div>
         </div>`;
     }).join('');
 
@@ -397,6 +401,233 @@ function renderTrucks(){
 }
 
 /* ---------------- DISPATCH LOG (right column) ---------------- */
+
+async function refreshDeliveryOrdersFromServer() {
+    try {
+        const res = await fetch('/orders', { headers: { 'Accept': 'application/json' } });
+        if(!res.ok) throw new Error('Failed to load order data');
+        const payload = await res.json();
+        const list = Array.isArray(payload) ? payload : (payload && Array.isArray(payload.data) ? payload.data : []);
+
+        orders = list.flatMap(order => {
+            const orderItems = Array.isArray(order.orderItems) ? order.orderItems : [];
+            if (!orderItems.length) return [];
+
+            const total = orderItems.reduce((sum, item) => {
+                const unitPrice = Number(item.UnitPrice || item.product?.Price || 0);
+                const qty = Number(item.Quantity || 0);
+                return sum + (unitPrice * qty);
+            }, 0);
+
+            return [{
+                id: 'ORD-' + (order.OrderID ?? order.id),
+                orderId: order.OrderID ?? order.id,
+                customer: order.CustomerName || 'Unknown',
+                contact: order.ContactNumber || '',
+                address: order.Address || '',
+                notes: order.Notes || '',
+                orderType: 'Delivery',
+                payment: order.transactions?.PaymentMethod || '',
+                paymentStatus: order.PaymentStatus || 'Payable',
+                total: Number(order.transactions?.Amount || total),
+                items: orderItems.map(item => ({
+                    name: item.product?.Product_Name || item.Product_Name || 'Item',
+                    qty: Number(item.Quantity) || 0,
+                    orderItemId: item.OrderItemID || item.id,
+                })),
+                orderItemIds: orderItems.map(item => item.OrderItemID || item.id),
+                status: (() => {
+                    const value = String(order.Status || 'Pending').toLowerCase();
+                    if (value.includes('complete')) return 'delivered';
+                    if (value.includes('cancel')) return 'returned';
+                    if (value.includes('partially') || value.includes('progress')) return 'assigned';
+                    return 'pending';
+                })(),
+                truck: null,
+                isSplitFrom: null,
+            }];
+        });
+
+        render();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function refreshDeliveryTrucksFromServer() {
+    try {
+        const res = await fetch('/trucks', { headers: { 'Accept': 'application/json' } });
+        if(!res.ok) throw new Error('Failed to load truck data');
+        trucks = mapTrucks(await res.json());
+        render();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+function makeCrudModalStyles() {
+    const id = 'delivery-crud-modal-styles';
+    if (document.getElementById(id)) return;
+
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = `
+        .delivery-crud-overlay{position:fixed;inset:0;background:rgba(10,12,17,.78);display:flex;align-items:center;justify-content:center;z-index:1200;padding:20px;}
+        .delivery-crud-modal{background:var(--panel,#11141c);border:2px solid #000;box-shadow:5px 5px 0 #000;width:min(480px,100%);max-height:85vh;overflow:auto;color:var(--text,#e9e7df);}
+        .delivery-crud-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:2px solid var(--border,#262b38);background:var(--panel-alt,#161a24);font-size:14px;font-weight:800;letter-spacing:.05em;}
+        .delivery-crud-close{width:28px;height:28px;border:1px solid var(--border,#262b38);background:transparent;color:var(--text-dim,#7b8296);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+        .delivery-crud-close:hover{color:var(--text,#e9e7df);border-color:var(--text-dim,#7b8296);}
+        .delivery-crud-close svg{width:13px;height:13px;}
+        .delivery-crud-body{display:grid;gap:12px;padding:18px;background:var(--panel,#11141c);}
+        .delivery-field{display:grid;gap:6px;}
+        .delivery-field label{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text,#e9e7df);}
+        .delivery-field input,.delivery-field select,.delivery-field textarea{width:100%;border:2px solid var(--border,#262b38);padding:9px 10px;background:var(--panel-alt,#161a24);color:var(--text,#e9e7df);font:inherit;box-sizing:border-box;}
+        .delivery-field textarea{min-height:80px;resize:vertical;}
+        .delivery-field input::placeholder,.delivery-field textarea::placeholder{color:var(--text-faint,#4d5265);}
+        .delivery-field input:focus,.delivery-field select:focus,.delivery-field textarea:focus{outline:none;border-color:var(--orange,#f5a623);box-shadow:0 0 0 2px rgba(245,166,35,.15);}
+        .delivery-crud-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px;}
+        .delivery-crud-sub{font-size:10px;color:var(--text-dim,#7b8296);line-height:1.5;}
+        .delivery-field select option{background:var(--panel,#11141c);color:var(--text,#e9e7df);}
+    `;
+    document.head.appendChild(style);
+}
+
+async function openTruckModal(mode = 'create', truckId = null) {
+    makeCrudModalStyles();
+    const isEdit = mode === 'edit';
+    let truck = null;
+    if (isEdit && truckId) {
+        try {
+            const res = await fetch(`/trucks/${truckId}`, { headers: { 'Accept': 'application/json' } });
+            if (res.ok) truck = await res.json();
+        } catch (err) {
+            console.error('Failed to load truck for edit', err);
+        }
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'delivery-crud-overlay';
+    overlay.innerHTML = `
+        <div class="delivery-crud-modal" role="dialog" aria-modal="true" aria-labelledby="truckCrudTitle">
+            <div class="delivery-crud-head">
+                <div id="truckCrudTitle">${isEdit ? 'EDIT TRUCK' : 'ADD TRUCK'}</div>
+                <button type="button" class="delivery-crud-close" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <form id="truckCrudForm" class="delivery-crud-body">
+                <div class="delivery-field">
+                    <label for="truckCrudName">TRUCK NAME</label>
+                    <input id="truckCrudName" name="TruckName" type="text" value="${escapeHtml(truck?.TruckName || '')}" required>
+                </div>
+                <div class="delivery-field">
+                    <label for="truckCrudPlate">PLATE NUMBER</label>
+                    <input id="truckCrudPlate" name="PlateNumber" type="text" value="${escapeHtml(truck?.PlateNumber || '')}">
+                </div>
+                <div class="delivery-field">
+                    <label for="truckCrudCapacity">CAPACITY</label>
+                    <input id="truckCrudCapacity" name="Capacity" type="number" min="0" value="${Number(truck?.Capacity || 0)}">
+                </div>
+                <div class="delivery-field">
+                    <label for="truckCrudStatus">STATUS</label>
+                    <select id="truckCrudStatus" name="Status">
+                        <option value="Idle" ${((truck?.Status || 'Idle') === 'Idle') ? 'selected' : ''}>Idle</option>
+                        <option value="Loading" ${((truck?.Status || 'Idle') === 'Loading') ? 'selected' : ''}>Loading</option>
+                        <option value="On Route" ${((truck?.Status || 'Idle') === 'On Route') ? 'selected' : ''}>On Route</option>
+                        <option value="Delivered" ${((truck?.Status || 'Idle') === 'Delivered') ? 'selected' : ''}>Delivered</option>
+                        <option value="Maintenance" ${((truck?.Status || 'Idle') === 'Maintenance') ? 'selected' : ''}>Maintenance</option>
+                    </select>
+                </div>
+                <div class="delivery-crud-actions">
+                    <button type="button" class="btn-ghost" id="truckCrudCancel">CANCEL</button>
+                    <button type="submit" class="mini-btn">${isEdit ? 'SAVE' : 'CREATE'}</button>
+                </div>
+            </form>
+        </div>`;
+
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('.delivery-crud-close').addEventListener('click', close);
+    overlay.querySelector('#truckCrudCancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    document.getElementById('truckCrudForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        const payload = {
+            TruckName: String(fd.get('TruckName') || '').trim(),
+            PlateNumber: String(fd.get('PlateNumber') || '').trim(),
+            Capacity: Number(fd.get('Capacity') || 0),
+            Status: String(fd.get('Status') || 'Idle'),
+        };
+
+        if (!payload.TruckName) {
+            alert('Please enter a truck name.');
+            return;
+        }
+
+        try {
+            const url = isEdit ? `/trucks/${truckId}` : '/trucks';
+            const method = isEdit ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                const message = errorData.message || (errorData.errors ? Object.values(errorData.errors).flat().join(' ') : 'Unable to save truck.');
+                throw new Error(message);
+            }
+
+            close();
+            await refreshDeliveryTrucksFromServer();
+        } catch (err) {
+            console.error(err);
+            alert(err.message || 'Unable to save truck.');
+        }
+    });
+}
+
+async function deleteTruck(truckId) {
+    if (!window.confirm('Delete this truck? Any assigned order items will return to unresolved/pending status.')) return;
+    try {
+        const res = await fetch(`/trucks/${truckId}`, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+        });
+        if (!res.ok) throw new Error('Failed to delete truck');
+        await refreshDeliveryTrucksFromServer();
+    } catch (err) {
+        console.error(err);
+        alert('Unable to delete truck.');
+    }
+}
+
+async function loadProductsForOrderForm() {
+    try {
+        const res = await fetch('/products', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('Failed to load products');
+        const data = await res.json();
+        return Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
+    } catch (err) {
+        console.error(err);
+        return [];
+    }
+}
+
+function registerDeliveryCrudControls() {
+    document.getElementById('addTruckBtn')?.addEventListener('click', () => openTruckModal('create'));
+}
 
 function buildDispatchLog(){
     const entries = [];
@@ -1246,6 +1477,7 @@ if (logTabsEl) {
     });
 }
 
+registerDeliveryCrudControls();
 render();
 
 /* ---------------- EXPOSE TO GLOBAL SCOPE ---------------- */
@@ -1258,6 +1490,8 @@ window.openDeliveryConfirmModal = openDeliveryConfirmModal;
 window.markReturned = markReturned;
 window.viewDispatchLog = viewDispatchLog;
 window.showTruckDetails = showTruckDetails;
+window.openTruckModal = openTruckModal;
+window.deleteTruck = deleteTruck;
 
 // Works alongside the existing HTML5 drag-and-drop in deliveries.js.
 // It does NOT handle drops – it only (1) marks the page as "dragging"

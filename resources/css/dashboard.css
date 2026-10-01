@@ -4,16 +4,16 @@
    ========================================================== */
 
 .dash {
-    --d-bg: #f6f1e7;
-    --d-card: #ffffff;
-    --d-ink: #1a1a1a;
-    --d-muted: #7a746a;
-    --d-line: #dcd5c6;
-    --d-orange: #e08a12;
-    --d-orange-dk: #b56d08;
-    --d-red: #d9382c;
-    --d-green: #2f9e57;
-    --d-blue: #2f6fd0;
+    --d-bg: var(--bg, #0a0c11);
+    --d-card: var(--panel, #11141c);
+    --d-ink: var(--text, #e9e7df);
+    --d-muted: var(--text-dim, #7b8296);
+    --d-line: var(--border, #262b38);
+    --d-orange: var(--orange, #f5a623);
+    --d-orange-dk: var(--orange-dark, #c9840f);
+    --d-red: var(--red, #ff5c5c);
+    --d-green: var(--green, #3fd15a);
+    --d-blue: var(--blue, #4d9eff);
 
     flex: 1;
     min-width: 0;
@@ -25,6 +25,20 @@
     box-sizing: border-box;
 }
 
+body.light-mode .dash,
+html.light-mode-pending body .dash {
+    --d-bg: var(--bg, #f4f2ec);
+    --d-card: var(--panel, #ffffff);
+    --d-ink: var(--text, #1a1a1a);
+    --d-muted: var(--text-dim, #5b6072);
+    --d-line: var(--border, #d8d5c8);
+    --d-orange: var(--orange, #e08a1a);
+    --d-orange-dk: var(--orange-dark, #c9840f);
+    --d-red: var(--red, #d63f3f);
+    --d-green: var(--green, #1f8c39);
+    --d-blue: var(--blue, #1c5fc4);
+}
+
 .dash-toolbar{
     position:sticky;
     top:0;
@@ -33,16 +47,6 @@
     padding-top:36px;
     padding-bottom:1px;
     background:var(--d-bg);
-}
-
-/* Dark theme hook — adjust the selector to match how your sidebar.js toggles themes */
-html[data-theme="dark"] .dash,
-body.dark-mode .dash {
-    --d-bg: #16140f;
-    --d-card: #221f18;
-    --d-ink: #f3ece0;
-    --d-muted: #a49c8d;
-    --d-line: #3a352a;
 }
 
 .dash *, .dash *::before, .dash *::after { box-sizing: border-box; }
@@ -202,14 +206,16 @@ a.stat-card:active {
 .quick-tile:hover {
     transform: translate(-2px, -2px);
     box-shadow: 6px 6px 0 var(--d-orange);
-    background: #fff6e6;
+    background: var(--panel-alt, #161a24);
 }
 .quick-tile:active {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0 var(--d-ink);
 }
-html[data-theme="dark"] .quick-tile:hover,
-body.dark-mode .quick-tile:hover { background: #2c2618; }
+body.light-mode .quick-tile:hover,
+html.light-mode-pending body .quick-tile:hover {
+    background: var(--panel-alt, #eeece3);
+}
 
 .quick-icon {
     display: grid;
@@ -257,13 +263,15 @@ body.dark-mode .quick-tile:hover { background: #2c2618; }
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 2px solid var(--d-ink);
+    border-bottom: 2px solid var(--d-line);
+    background: var(--panel-alt, #161a24);
 }
 .panel-title {
     margin: 0;
     font-size: 13px;
     font-weight: 800;
     letter-spacing: 2px;
+    color: var(--d-ink);
 }
 .panel-link {
     padding: 5px 10px;

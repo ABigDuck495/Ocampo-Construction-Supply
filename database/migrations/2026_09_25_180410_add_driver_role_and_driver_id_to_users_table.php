@@ -12,17 +12,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Add Driver to the users Role enum
-        |--------------------------------------------------------------------------
-        */
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite does not support MySQL enum ALTER statements; the app's model validation handles the allowed values.
+        } else {
+            /*
+            |--------------------------------------------------------------------------
+            | Add Driver to the users Role enum
+            |--------------------------------------------------------------------------
+            */
 
-        DB::statement("
-            ALTER TABLE users
-            MODIFY Role ENUM('Admin', 'Staff', 'Driver')
-            NOT NULL DEFAULT 'Staff'
-        ");
+            DB::statement("
+                ALTER TABLE users
+                MODIFY Role ENUM('Admin', 'Staff', 'Driver')
+                NOT NULL DEFAULT 'Staff'
+            ");
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -60,6 +64,10 @@ return new class extends Migration
 
             $table->dropColumn('DriverID');
         });
+
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
 
         /*
         |--------------------------------------------------------------------------

@@ -9,8 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Widen first so no existing rows get truncated, then narrow to the final set
-        DB::statement("ALTER TABLE dispatches MODIFY COLUMN Status ENUM('Pending', 'On Route', 'Delivered', 'Failed') NOT NULL DEFAULT 'Pending'");
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite does not support MySQL enum ALTER statements.
+        } else {
+            // Widen first so no existing rows get truncated, then narrow to the final set
+            DB::statement("ALTER TABLE dispatches MODIFY COLUMN Status ENUM('Pending', 'On Route', 'Delivered', 'Failed') NOT NULL DEFAULT 'Pending'");
+        }
 
         Schema::table('dispatches', function (Blueprint $table) {
             $table->timestamp('AcceptedAt')->nullable()->after('DispatchDate');

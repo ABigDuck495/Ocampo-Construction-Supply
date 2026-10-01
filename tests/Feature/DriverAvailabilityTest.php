@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Dispatch;
 use App\Models\Driver;
+use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -18,6 +19,19 @@ class DriverAvailabilityTest extends TestCase
             $table->id('DriverID');
             $table->string('Name');
             $table->string('PhoneNumber')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('users', function (Blueprint $table) {
+            $table->id('UserID');
+            $table->string('Name');
+            $table->string('Email')->nullable();
+            $table->string('Password');
+            $table->enum('Role', ['Admin', 'Staff', 'Driver'])->default('Staff');
+            $table->string('PhoneNumber')->nullable();
+            $table->enum('Status', ['Active', 'Inactive'])->default('Active');
+            $table->unsignedBigInteger('DriverID')->nullable();
+            $table->timestamp('LastLoginAt')->nullable();
             $table->timestamps();
         });
 
@@ -44,9 +58,29 @@ class DriverAvailabilityTest extends TestCase
     {
         Schema::dropIfExists('dispatch_drivers');
         Schema::dropIfExists('dispatches');
+        Schema::dropIfExists('users');
         Schema::dropIfExists('drivers');
 
         parent::tearDown();
+    }
+
+    public function test_driver_users_create_a_matching_driver_record(): void
+    {
+        $user = User::create([
+            'Name' => 'Driver User',
+            'Email' => 'driver.user@example.com',
+            'Password' => 'secret123',
+            'Role' => 'Driver',
+            'PhoneNumber' => '09170001111',
+            'Status' => 'Active',
+        ]);
+
+        $driver = Driver::where('Name', 'Driver User')->first();
+
+        $this->assertNotNull($driver);
+        $this->assertNotNull($user->DriverID);
+        $this->assertSame($driver->DriverID, $user->DriverID);
+        $this->assertSame('09170001111', $driver->PhoneNumber);
     }
 
     public function test_only_non_active_dispatch_drivers_are_listed_as_available(): void

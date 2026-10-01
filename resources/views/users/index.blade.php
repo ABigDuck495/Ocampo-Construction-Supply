@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <title>Users - Ocampo Construction and Hardware Supplies</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -51,7 +52,10 @@
     <div class="users-actions">
         <div class="hint">&middot; Click ACTIVITY to view a user's log &middot;</div>
         <div class="users-toolbar">
-       
+            <button type="button" class="btn-add-user" id="addUserBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                ADD USER
+            </button>
         </div>
     </div>
 

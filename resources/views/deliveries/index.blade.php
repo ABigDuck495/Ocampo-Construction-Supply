@@ -91,6 +91,9 @@
         <section class="ws-panel fleet-panel">
             <div class="ws-head fleet-head">
                 <div class="fleet-title">ACTIVE FLEET</div>
+                <div class="ws-head-actions">
+                    <button type="button" class="mini-btn" id="addTruckBtn">ADD TRUCK</button>
+                </div>
                 <div class="fleet-stats">
                     <div class="fstat idle"><b id="fIdle"></b><span>IDLE</span></div>
                     <div class="fstat loading"><b id="fLoading"></b><span>LOADING</span></div>

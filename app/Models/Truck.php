@@ -22,10 +22,10 @@ class Truck extends Model
     //     return $this->belongsToMany(Driver::class, 'dispatch_drivers', 'TruckID', 'DriverID')->withPivot('Role');
     // }
     public function scopeAvailable($query){
-        return $query->where('Status', 'Available');
+        return $query->where('Status', 'Idle');
     }
     public function isAvailable(){
-        return $this->Status === 'Available';
+        return $this->Status === 'Idle';
     }
 
 }

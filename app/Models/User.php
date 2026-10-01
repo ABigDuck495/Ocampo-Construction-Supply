@@ -12,7 +12,7 @@ class User extends Authenticatable
     use HasApiTokens;
     protected $table = 'users';
     protected $primaryKey = 'UserID';
-    protected $fillable = ['Name', 'Password', 'Role', 'Email', 'PhoneNumber', 'Status', 'LastLoginAt'];
+    protected $fillable = ['Name', 'Password', 'Role', 'Email', 'PhoneNumber', 'Status', 'DriverID', 'LastLoginAt'];
     protected $hidden = ['Password'];
 
     protected $guarded = ['UserID'];
@@ -21,6 +21,32 @@ class User extends Authenticatable
     protected $casts = [
         'LastLoginAt' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $user) {
+            $role = strtoupper($user->Role ?? 'Staff');
+
+            if ($role === 'DRIVER') {
+                $driver = Driver::firstOrCreate(
+                    ['Name' => $user->Name],
+                    ['PhoneNumber' => $user->PhoneNumber]
+                );
+
+                if ($user->PhoneNumber !== null && $driver->PhoneNumber !== $user->PhoneNumber) {
+                    $driver->PhoneNumber = $user->PhoneNumber;
+                    $driver->save();
+                }
+
+                $user->DriverID = $driver->DriverID;
+                return;
+            }
+
+            if ($user->DriverID !== null) {
+                $user->DriverID = null;
+            }
+        });
+    }
 
     public function orders(){
         return $this->hasMany(Order::class, 'CreatedBy', 'UserID');

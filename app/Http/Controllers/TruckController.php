@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Dispatch;
+use App\Models\DispatchLog;
 use App\Models\Truck;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TruckController extends Controller
 {
@@ -32,7 +35,7 @@ class TruckController extends Controller
             'TruckName' => 'nullable|string|max:255',
             'PlateNumber' => 'nullable|string|max:50',
             'Capacity' => 'nullable|numeric',
-            'Status' => 'nullable|in:Available,Unavailable',
+            'Status' => 'nullable|in:Idle,Loading,On Route,Delivered,Maintenance',
         ]);
 
         return Truck::create($validated);
@@ -63,7 +66,7 @@ class TruckController extends Controller
             'TruckName' => 'sometimes|required|string|max:255',
             'PlateNumber' => 'nullable|string|max:50',
             'Capacity' => 'nullable|numeric',
-            'Status' => 'nullable|in:Available,Unavailable',
+            'Status' => 'nullable|in:Idle,Loading,On Route,Delivered,Maintenance',
         ]);
 
         $truck = Truck::findOrFail($id);
@@ -79,9 +82,31 @@ class TruckController extends Controller
     public function destroy(string $id)
     {
         $truck = Truck::findOrFail($id);
-        $truck->delete();
 
-        return response()->json(['message' => 'Truck deleted successfully.'], 200);
+        DB::transaction(function () use ($truck) {
+            $dispatches = Dispatch::where('TruckID', $truck->TruckID)->get();
+
+            foreach ($dispatches as $dispatch) {
+                $dispatch->update(['Status' => 'Failed']);
+
+                $orderItem = $dispatch->orderItem;
+                if ($orderItem) {
+                    $orderItem->recalculateStatus();
+                    app(OrderController::class)->syncStatus($orderItem->order);
+                }
+
+                DispatchLog::create([
+                    'DispatchID' => $dispatch->DispatchID,
+                    'Action' => 'Failed',
+                    'Notes' => 'Truck deleted; assigned order items returned to pending/unresolved state.',
+                    'LoggedAt' => now(),
+                ]);
+            }
+
+            $truck->delete();
+        });
+
+        return response()->json(['message' => 'Truck deleted successfully. Assigned order items were returned to unresolved status.'], 200);
     }
     public function available(){
         return Truck::available()->get();

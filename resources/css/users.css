@@ -104,3 +104,114 @@
 .activity-entry-action{font-weight:700;color:var(--text);}
 .activity-entry-time{color:var(--text-faint);}
 .activity-entry-detail{font-size:10.5px;color:var(--text-dim);}
+
+.user-modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(10,12,17,.78);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:20px;
+}
+
+.user-modal{
+    width:min(460px,100%);
+    background:var(--panel);
+    color:var(--text);
+    border:2px solid #000;
+    box-shadow:5px 5px 0 #000;
+    max-height:85vh;
+    overflow-y:auto;
+}
+
+.user-modal-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:16px 18px;
+    border-bottom:2px solid var(--border);
+    background:var(--panel-alt);
+    font-size:14px;
+    font-weight:800;
+    letter-spacing:.04em;
+}
+
+.user-modal-close{
+    width:28px;
+    height:28px;
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--text-dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+}
+
+.user-modal-close:hover{color:var(--text);}
+.user-modal-close svg{width:13px;height:13px;}
+
+.user-modal-body{
+    display:grid;
+    gap:12px;
+    padding:18px;
+}
+
+.user-field{
+    display:grid;
+    gap:6px;
+}
+
+.user-field label{
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.08em;
+    color:var(--text);
+}
+
+.user-field input,
+.user-field select{
+    width:100%;
+    border:2px solid var(--border);
+    background:var(--panel-alt);
+    color:var(--text);
+    padding:10px 12px;
+    font:inherit;
+    box-sizing:border-box;
+}
+
+.user-field input::placeholder,
+.user-field select::placeholder{
+    color:var(--text-faint);
+}
+
+.user-field input:focus,
+.user-field select:focus{
+    outline:none;
+    border-color:var(--orange);
+    box-shadow:0 0 0 2px rgba(245,166,35,.15);
+}
+
+.user-helper{
+    font-size:9.5px;
+    color:var(--text-faint);
+}
+
+.user-modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:4px;
+}
+
+.btn-ghost.danger{
+    color:#a9432b;
+    border-color:#a9432b;
+}
+
+.btn-ghost.danger:hover{
+    background:#fff0ee;
+}

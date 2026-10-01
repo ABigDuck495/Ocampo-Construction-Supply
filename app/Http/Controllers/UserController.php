@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Driver;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -47,7 +48,11 @@ class UserController extends Controller
             'Status' => 'nullable|in:Active,Inactive',
         ]);
 
-        return User::create($validated);
+        $user = User::create($validated);
+        $this->syncDriverRecord($user, $validated);
+        $user->save();
+
+        return $user->fresh();
     }
 
     /**
@@ -82,9 +87,10 @@ class UserController extends Controller
 
         $user = User::findOrFail($id);
         $user->fill($validated);
+        $this->syncDriverRecord($user, $validated);
         $user->save();
 
-        return $user;
+        return $user->fresh();
     }
 
     /**
@@ -108,6 +114,32 @@ class UserController extends Controller
                 ->when($request->date, fn($q) => $q->whereDate('TransactionDate', $request->date))
                 ->count(),
         ]);
+    }
+
+    private function syncDriverRecord(User $user, array $validated): void
+    {
+        $role = strtoupper($validated['Role'] ?? $user->Role ?? 'Staff');
+
+        if ($role !== 'DRIVER') {
+            $user->DriverID = null;
+            return;
+        }
+
+        $name = $validated['Name'] ?? $user->Name;
+        $phone = $validated['PhoneNumber'] ?? $user->PhoneNumber;
+
+        $driver = Driver::firstOrCreate(
+            ['Name' => $name],
+            ['PhoneNumber' => $phone]
+        );
+
+        if ($phone !== null && $driver->PhoneNumber !== $phone) {
+            $driver->PhoneNumber = $phone;
+            $driver->save();
+        }
+
+        $user->DriverID = $driver->DriverID;
+        $user->Role = 'Driver';
     }
 
     private function formatUser(User $user): array

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('TruckName')->nullable();
             $table->string('PlateNumber')->nullable();
             $table->float('Capacity', precision: 53)->nullable();
-            $table->enum('Status', ['Available', 'Unavailable'])->default('Available');
+            $table->enum('Status', ['Idle', 'Loading', 'On Route', 'Delivered', 'Maintenance'])->default('Idle');
             $table->timestamps();
         });
     }
