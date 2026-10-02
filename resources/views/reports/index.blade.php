@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Reports - Ocampo Construction and Hardware Supplies</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
 
@@ -49,6 +50,7 @@
         <div class="tabs" id="reportTabs">
             <div class="tab active" data-tab="sales">SALES SUMMARY</div>
             <div class="tab" data-tab="delivery">DELIVERY HISTORY</div>
+            <div class="tab" data-tab="payments">PAYMENT STATUS</div>
         </div>
         </div>
 
@@ -179,6 +181,9 @@
                 </div>
             </div>
         </div>
+            <div class="report-view" id="view-payments">
+                @include('reports.partials.payment-status')
+            </div>
     </main>
 
     <!-- Shared + page scripts -->

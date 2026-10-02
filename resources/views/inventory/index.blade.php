@@ -46,7 +46,7 @@
                     <div class="hstat low"><b id="statLow">0</b><span>LOW STOCK</span></div>
                 </div>
                 <div class="header-actions">
-                    <button class="add-product-btn arcwwwhive-view-btn" id="archivedBtn" type="button" data-archived-url="{{ route('inventory.archived') }}">ARCHIVED</button>
+                    <button class="add-product-btn archive-view-btn" id="archivedBtn" type="button" data-archived-url="{{ route('inventory.archived') }}">ARCHIVED</button>
                     <button class="add-product-btn" id="addProductBtn" type="button">+ ADD PRODUCT</button>
                 </div>
             </div>

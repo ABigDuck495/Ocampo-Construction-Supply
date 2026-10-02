@@ -13,6 +13,9 @@ class Transaction extends Model
         'TransactionDate',
         'Amount',
         'PaymentMethod',
+        'ReceivedBy', 
+        'HandedOverBy', 
+        'PaymentUpdatedAt',
     ];
     protected $guarded = ['TransactionID'];
     public function order(){

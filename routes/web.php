@@ -21,6 +21,7 @@ use App\Http\Controllers\TruckController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PaymentStatusController;
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -112,8 +113,10 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/products/{id}/archive', [ProductController::class, 'archive'])->name('products.archive');
         Route::get('/inventory/archived', [InventoryController::class, 'archived'])->name('inventory.archived');
         Route::patch('/products/{id}/restore', [ProductController::class, 'restore'])->name('products.restore');
+        Route::get('/reports/payments/data', [PaymentStatusController::class, 'data'])->name('reports.payments.data');
+        Route::patch('/reports/payments/{id}', [PaymentStatusController::class, 'update'])->name('reports.payments.update');
+    });
  
     Route::middleware(['role:Admin'])->group(function () {
         Route::resource('users', UserController::class);
     });
-});

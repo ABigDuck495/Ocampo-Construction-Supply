@@ -19,6 +19,7 @@
    - Other pages in the same browser can trigger an instant refresh with:
          new BroadcastChannel('ocampo-data').postMessage('changed');
    ============================================================ */
+import { initPaymentStatus } from './payment-status.js';
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -28,6 +29,7 @@ let recentSales = [];
 let itemsOrdered = [];
 let deliveryHistory = [];
 let reportSummaries = [];
+
 
 // live-refresh state
 let appliedParams = null;          // query string used for the Sales Summary fetch
@@ -456,10 +458,12 @@ document.getElementById('reportTabs').addEventListener('click', e => {
 
     // Revenue/Orders/Avg Order stats + month picker only make sense for
     // Sales Summary — hide them on Delivery History.
-    const headerStatsEl = document.getElementById('headerStats');
+        const headerStatsEl = document.getElementById('headerStats');
     if(headerStatsEl){
-        headerStatsEl.style.display = (target === 'delivery') ? 'none' : '';
+        headerStatsEl.style.display = (target === 'delivery' || target === 'payments') ? 'none' : '';
     }
+
+    if (target === 'payments') initPaymentStatus();
 });
 
 /* ---------------- INIT ---------------- */
