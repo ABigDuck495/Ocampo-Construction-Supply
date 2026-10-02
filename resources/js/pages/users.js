@@ -156,6 +156,11 @@ function openUserModal(mode = 'create', user = null){
                 </div>
 
                 <div class="user-field">
+                    <label for="userUsername">USERNAME</label>
+                    <input id="userUsername" name="Username" type="text" value="${escapeHtml(user?.username ?? '')}" required>
+                </div>
+
+                <div class="user-field">
                     <label for="userEmail">EMAIL</label>
                     <input id="userEmail" name="Email" type="email" value="${escapeHtml(user?.email ?? '')}">
                 </div>
@@ -212,6 +217,7 @@ function openUserModal(mode = 'create', user = null){
         const formData = new FormData(form);
         const payload = {
             Name: String(formData.get('Name') || '').trim(),
+            Username: String(formData.get('Username') || '').trim(),
             Email: String(formData.get('Email') || '').trim(),
             PhoneNumber: String(formData.get('PhoneNumber') || '').trim(),
             Role: String(formData.get('Role') || 'Staff'),
@@ -223,6 +229,11 @@ function openUserModal(mode = 'create', user = null){
 
         if (!payload.Name) {
             alert('Please enter a user name.');
+            return;
+        }
+
+        if (!payload.Username) {
+            alert('Please enter a username.');
             return;
         }
 

@@ -32,14 +32,28 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropUnique('users_username_unique');
-            $table->dropColumn('Username');
-        });
+        if ($this->indexExists('users', 'users_username_unique')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropUnique('users_username_unique');
+            });
+        }
+
+        if (Schema::hasColumn('users', 'Username')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropColumn('Username');
+            });
+        }
     }
 
     private function indexExists(string $table, string $indexName): bool
     {
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $indexes = DB::select("PRAGMA index_list('{$table}')");
+            return collect($indexes)->contains(fn ($index) => ($index->name ?? null) === $indexName);
+        }
+
         $indexes = DB::select("SHOW INDEX FROM {$table} WHERE Key_name = ?", [$indexName]);
         return count($indexes) > 0;
     }

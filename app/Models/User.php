@@ -12,7 +12,7 @@ class User extends Authenticatable
     use HasApiTokens;
     protected $table = 'users';
     protected $primaryKey = 'UserID';
-    protected $fillable = ['Name', 'Password', 'Role', 'Email', 'PhoneNumber', 'Status', 'DriverID', 'LastLoginAt'];
+    protected $fillable = ['Name', 'Username', 'Password', 'Role', 'Email', 'PhoneNumber', 'Status', 'DriverID', 'LastLoginAt'];
     protected $hidden = ['Password'];
 
     protected $guarded = ['UserID'];

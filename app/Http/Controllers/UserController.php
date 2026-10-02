@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Driver;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -41,6 +42,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'Name' => 'required|string|max:255',
+            'Username' => ['required', 'string', 'max:255', Rule::unique('users', 'Username')],
             'Password' => 'required|string|min:6',
             'Role' => 'nullable|string|max:50',
             'Email' => 'nullable|email|max:255',
@@ -78,6 +80,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'Name' => 'sometimes|required|string|max:255',
+            'Username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users', 'Username')->ignore($id, 'UserID')],
             'Password' => 'nullable|string|min:6',
             'Role' => 'nullable|string|max:50',
             'Email' => 'nullable|email|max:255',
@@ -147,6 +150,7 @@ class UserController extends Controller
         return [
             'id' => $user->UserID,
             'name' => $user->Name,
+            'username' => $user->Username,
             'email' => $user->Email,
             'role' => strtolower($user->Role ?? ''),
             'status' => strtolower($user->Status ?? 'active'),

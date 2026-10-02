@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.docker
+node_modules
+vendor
+/storage/*.key
+/storage/logs
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/public/build
+/public/hot
+.idea
+.vscode
+.DS_Store
