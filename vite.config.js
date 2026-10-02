@@ -18,6 +18,7 @@ export default defineConfig({
                 'resources/js/pages/inventory.js',
                 'resources/css/inventory.css',
                 'resources/js/pages/printReceipt.js',
+                'resources/js/pages/pos-toolbar.js'
 
             ],
             refresh: true,

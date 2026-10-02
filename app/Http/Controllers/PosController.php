@@ -49,7 +49,7 @@ class PosController extends Controller
 
         $inventoryTrackingEnabled = (bool) ($systemSettings['enable_inventory_tracking'] ?? true);
 
-        return DB::transaction(function () use ($validated, $isPickup) {
+        return DB::transaction(function () use ($validated, $isPickup, $inventoryTrackingEnabled) {
             foreach ($validated['items'] as $item) {
                 $product = Product::findOrFail($item['ProductID']);
                 $qtyValue = (float) $item['Quantity'];

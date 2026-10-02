@@ -34,7 +34,7 @@ class OrderItem extends Model
         return $this->belongsTo(Order::class, 'OrderID', 'OrderID');
     }
     public function product(){
-        return $this->belongsTo(Product::class, 'ProductID', 'ProductID');
+        return $this->belongsTo(Product::class, 'ProductID', 'ProductID')->withTrashed();
     }
 
     public function dispatches(){

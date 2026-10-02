@@ -6,6 +6,7 @@ import { printReceipt } from './printReceipt.js'
 import { toast } from './toast.js'
 import { fuzzySearch } from '../fuzzySearch.js'
 import '../pt210-printer.js'
+import { initGroups, buildGroups, openGroup, normalizeText, matchesQuery, priceRange } from './posGroups.js'
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
@@ -33,13 +34,17 @@ const products = rawProducts.map(p => ({
     pricingType: valOf(p, 'Pricing_type', 'pricing_type', 'pricingType') || 'Fixed',
     stock: Number(valOf(p, 'inventory', 'Inventory')?.QuantityOnHand ?? valOf(p, 'QuantityOnHand', 'quantity', 'Stock') ?? 0),
     subCategory: valOf(p, 'SubCategory', 'subCategory') || '',
+    sku: valOf(p, 'SKU', 'sku') || '',
 }));
 
 function escapeHtml(str){
-    const d = document.createElement('div');
-    d.textContent = str ?? '';
-    return d.innerHTML;
-}
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}   
 
 const icons = {
     Tools:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
@@ -55,69 +60,75 @@ let cart = [];
 let activeCat = 'all';
 let selectedPayment = null;
 let orderType = 'Delivery';
+let groups = [];
+let searchTerm = '';
+const GROUP_CAP = 200;
 
 function fmt(n){ return '₱' + Number(n).toFixed(2); }
 
 /* ---------------- RENDER: PRODUCTS ---------------- */
 function renderProducts(){
     const grid = document.getElementById('productGrid');
-    const list = activeCat === 'all' ? products : products.filter(p => p.cat === activeCat);
+    const q = normalizeText(searchTerm);
+    let list = activeCat === 'all' ? groups : groups.filter(g => g.cat === activeCat);
+    if(q) list = list.filter(g => matchesQuery(g.search, q));
 
-    grid.innerHTML = list.map(p => {
-        const priceHtml = (p.pricingType === 'Variable' || p.price === null) ?
-            `<select class="price-select" data-id="${p.id}"><option value="">Variable</option><option value="resolve">Enter Price...</option></select>` :
-            `<div class="product-price">${fmt(p.price)}</div>`;
-        return `
-        <div class="product-card" data-id="${p.id}">
-            <div class="product-icon">${iconFor(p.cat)}</div>
-            <div class="product-name">${p.name}</div>
-            <div class="product-cat">${escapeHtml(p.cat)}${p.subCategory ? ' · ' + escapeHtml(p.subCategory) : ''}</div>
-            ${priceHtml}
-            ${INVENTORY_TRACKING_ENABLED ? `<div class="product-stock">Stock: ${p.stock}</div>` : ''}
-        </div>`;
-    }).join('');
+    const countEl = document.getElementById('searchCount');
+    if(countEl){
+        countEl.textContent = q ? `${list.length} GROUP${list.length === 1 ? '' : 'S'}` : '';
+        countEl.classList.toggle('empty', !!q && !list.length);
+    }
 
-    grid.querySelectorAll('.product-card').forEach(card => {
-        card.addEventListener('click', () => addToCart(card.dataset.id));
-    });
-
-    // Price select handler for variable pricing: allow quick resolve or leave variable
-    grid.querySelectorAll('.price-select').forEach(sel => {
-        sel.addEventListener('change', (e) => {
-            const id = sel.dataset.id;
-            if (sel.value === 'resolve') {
-                const val = prompt('Enter unit price (PHP):');
-                const num = val ? Number(val) : null;
-                if (num && num >= 0) {
-                    // Update local product price for this session so cart picks it up
-                    const prod = products.find(x => String(x.id) === String(id));
-                    if (prod) { prod.price = num; prod.pricingType = 'Fixed'; }
-                    sel.replaceWith(`<div class="product-price">${fmt(num)}</div>`);
-                } else {
-                    alert('Invalid price entered.');
-                    sel.value = '';
-                }
-            }
-        });
-    });
+    grid.innerHTML = list.slice(0, GROUP_CAP).map(g => `
+        <div class="product-card group-card" data-key="${escapeHtml(g.key)}">
+            <div class="product-icon">${iconFor(g.cat)}</div>
+            <div class="product-name">${escapeHtml(g.label)}</div>
+            <div class="product-cat">${escapeHtml(g.cat || '')}</div>
+            <div class="product-count">${g.variants.length} VARIANT${g.variants.length === 1 ? '' : 'S'}</div>
+            <div class="product-price">${priceRange(g)}</div>
+        </div>`).join('') +
+        (list.length > GROUP_CAP ? `<div class="grid-more">Showing ${GROUP_CAP} of ${list.length} groups. Use search or a category to narrow down.</div>` : '') +
+        (!list.length ? `<div class="grid-more">No products found.</div>` : '');
 }
 
+document.getElementById('productGrid')?.addEventListener('click', e => {
+    const card = e.target.closest('.group-card');
+    if(!card) return;
+    const g = groups.find(x => x.key === card.dataset.key);
+    if(g) openGroup(g, searchTerm);
+});
+
+const _search = document.getElementById('productSearch');
+const _clear = document.getElementById('searchClear');
+if(_search){
+    _search.addEventListener('input', () => {
+        searchTerm = _search.value;
+        if(_clear) _clear.hidden = !searchTerm;
+        renderProducts();
+    });
+}
+if(_clear) _clear.addEventListener('click', () => {
+    _search.value = ''; searchTerm = ''; _clear.hidden = true; renderProducts(); _search.focus();
+});
+
 /* ---------------- CART LOGIC ---------------- */
-function addToCart(productId){
+function addToCart(productId, qty = 1, priceOverride = null){
     const product = products.find(p => String(p.id) === String(productId));
-    if(!product) return;
+    if(!product) return false;
 
     const existing = cart.find(c => String(c.id) === String(productId));
     const currentQty = existing ? existing.qty : 0;
 
-    if(INVENTORY_TRACKING_ENABLED && currentQty + 1 > product.stock){
+    if(INVENTORY_TRACKING_ENABLED && currentQty + qty > product.stock){
         toast(`Not enough stock for ${product.name}. Available: ${product.stock}`, 'error');
-        return;
+        return false;
     }
+    const price = priceOverride !== null ? priceOverride : product.price;
 
-    if(existing){ existing.qty += 1; }
-    else { cart.push({ id: product.id, name: product.name, price: product.price, qty: 1, stock: product.stock, pricingType: product.pricingType || 'Fixed' }); }
+    if(existing){ existing.qty += qty; if(priceOverride !== null) existing.price = price; }
+    else { cart.push({ id: product.id, name: product.name, price, qty, stock: product.stock, pricingType: priceOverride !== null ? 'Fixed' : (product.pricingType || 'Fixed') }); }
     renderCart();
+    return true;
 }
 
 function changeQty(productId, delta){
@@ -344,25 +355,23 @@ function buildPrintPayload(order){
     };
 }
 
-/* ---------------- PRINT (thermal printer, w/ browser-print fallback) ---------------- */
+/* ---------------- PRINT (thermal printer only - no browser-print fallback) ---------------- */
 const _printBtn = document.getElementById('printBtn');
 if(_printBtn) _printBtn.addEventListener('click', async () => {
-    if(!pendingOrder){ window.print(); return; }
+    if(!pendingOrder){ toast('Nothing to print yet.', 'error'); return; }
     const btn = _printBtn;
     btn.disabled = true;
     try {
         const result = await printReceipt(buildPrintPayload(pendingOrder));
         if(result.status !== 'printed'){
-            console.error('Thermal print failed:', result.message);
-            toast((result.message || 'Thermal print failed.') + ' Falling back to browser print.', 'error');
-            window.print();
+            console.error('Thermal print failed:', result);
+            toast(result.message || 'Thermal print failed.', 'error');
         } else {
             toast('Receipt printed.', 'success');
         }
     } catch (err) {
         console.error('Thermal print error:', err);
-        toast('Could not reach the printer. Falling back to browser print.', 'error');
-        window.print();
+        toast('Could not reach the printer: ' + (err && err.message ? err.message : 'unknown error'), 'error');
     } finally {
         btn.disabled = false;
     }
@@ -413,7 +422,7 @@ async function submitSale(triggerBtn){
         try {
             const printResult = await printReceipt(printPayload);
             if(printResult.status !== 'printed'){
-                console.error('Thermal print failed:', printResult.message);
+                console.error('Thermal print failed:', printResult);
                 toast((printResult.message || 'Thermal print failed.') + ' You can reprint from the receipt if needed.', 'error');
             } else {
                 toast('Sale saved and receipt printed.', 'success');
@@ -464,9 +473,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const connectBtn = document.getElementById('connect-printer-btn');
     if (!statusEl || !connectBtn) return;
 
+    const printerCfg = window.POS_DATA && window.POS_DATA.printer;
+
     function renderPrinterStatus(status) {
         if (status === 'connected') {
-            statusEl.textContent = 'Printer: PT210 Connected';
+            statusEl.textContent = 'Printer: XP80 Connected';
             statusEl.classList.add('connected');
             connectBtn.style.display = 'none';
         } else {
@@ -474,6 +485,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusEl.classList.remove('connected');
             connectBtn.style.display = 'inline-block';
         }
+    }
+
+    // Network and USB printers are driven by the server, so there is
+    // nothing to connect from the browser (no Web Serial / PT210 needed).
+    if (printerCfg && printerCfg.connection_type !== 'bluetooth') {
+        const where = printerCfg.connection_type === 'network'
+            ? `${printerCfg.ip_address}:${printerCfg.port}`
+            : `USB (${printerCfg.usb_printer_name})`;
+        statusEl.textContent = `Printer: ${printerCfg.name} · ${where}`;
+        statusEl.classList.remove('connected');
+        connectBtn.style.display = 'none';
+        return;
     }
 
     if (!window.pt210 || !window.pt210.isSupported()) {
@@ -485,7 +508,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     window.pt210.onStatusChange = renderPrinterStatus;
 
-    const reconnected = await window.pt210.tryReconnect();
+    // tryReconnect() throws if the COM port is busy; catch it so the
+    // status never gets stuck on "Checking...".
+    let reconnected = false;
+    try {
+        reconnected = await window.pt210.tryReconnect();
+    } catch (err) {
+        console.warn('XP80 auto-reconnect failed:', err);
+    }
     renderPrinterStatus(reconnected ? 'connected' : 'disconnected');
 
     connectBtn.addEventListener('click', async () => {
@@ -501,6 +531,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 /* ---------------- INIT ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
+    initGroups({
+        fmt, escapeHtml,
+        inventoryOn: INVENTORY_TRACKING_ENABLED,
+        cartQty: id => (cart.find(c => String(c.id) === String(id))?.qty || 0),
+        addToCart,
+    });
+    groups = buildGroups(products);
     buildCategoryTabs();
     renderProducts();
     renderCart();
@@ -522,90 +559,3 @@ document.getElementById('testPrintBtn')?.addEventListener('click', async () => {
     console.log('Print result:', result);
     toast(result.status === 'printed' ? 'Printed!' : 'Failed: ' + result.message, result.status === 'printed' ? 'success' : 'error');
 });
-
-
-// ==========================================================
-// POS TOOLBAR — product search + pinned toolbar height
-// Works alongside pos.js without touching it: search hides
-// already-rendered .product-card elements, and a MutationObserver
-// re-applies the filter whenever pos.js re-renders the grid
-// (category tab change, etc.).
-// ==========================================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    initToolbarHeight();
-    initProductSearch();
-});
-
-// ---------- Pinned toolbar height (for the sticky cart panel) ----------
-function initToolbarHeight() {
-    const toolbar = document.querySelector('.page-toolbar');
-    if (!toolbar) return;
-
-    const update = () => {
-        document.documentElement.style.setProperty('--toolbar-h', toolbar.offsetHeight + 'px');
-    };
-
-    update();
-    window.addEventListener('resize', update);
-
-    if ('ResizeObserver' in window) {
-        new ResizeObserver(update).observe(toolbar);
-    }
-}
-
-// ---------- Product search ----------
-function initProductSearch() {
-    const input = document.getElementById('productSearch');
-    const clearBtn = document.getElementById('searchClear');
-    const countEl = document.getElementById('searchCount');
-    const grid = document.getElementById('productGrid');
-    if (!input || !grid) return;
-
-    const applyFilter = () => {
-        const query = input.value.trim();
-        const cards = Array.from(grid.querySelectorAll('.product-card'));
-        const searchableCards = cards.map(card => ({ card, text: card.textContent }));
-        const matches = new Set(fuzzySearch(searchableCards, query, ['text']).map(item => item.card));
-        let shown = 0;
-
-        cards.forEach((card) => {
-            const match = matches.has(card);
-            card.style.display = match ? '' : 'none';
-            if (match) shown++;
-        });
-
-        clearBtn.hidden = query === '';
-
-        if (!query) {
-            countEl.textContent = '';
-            countEl.classList.remove('empty');
-        } else if (shown === 0) {
-            countEl.textContent = 'NO MATCHES';
-            countEl.classList.add('empty');
-        } else {
-            countEl.textContent = shown + (shown === 1 ? ' RESULT' : ' RESULTS');
-            countEl.classList.remove('empty');
-        }
-    };
-
-    input.addEventListener('input', applyFilter);
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            input.value = '';
-            applyFilter();
-        }
-    });
-
-    clearBtn.addEventListener('click', () => {
-        input.value = '';
-        applyFilter();
-        input.focus();
-    });
-
-    // pos.js re-renders the grid on tab change — keep the filter applied.
-    new MutationObserver(applyFilter).observe(grid, { childList: true });
-
-    applyFilter();
-}

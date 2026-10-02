@@ -118,4 +118,20 @@ class ProductController extends Controller
             ->limit(10)
             ->get();
     }
+
+    public function archive(string $id)
+    {
+        $product = Product::findOrFail($id);
+        $product->delete(); // soft delete: sets archived_at, row is kept
+
+        return response()->json(['message' => 'Product archived.']);
+    }
+
+    public function restore(string $id)
+    {
+        $product = Product::onlyTrashed()->findOrFail($id);
+        $product->restore();
+
+        return response()->json(['message' => 'Product restored.']);
+    }
 }

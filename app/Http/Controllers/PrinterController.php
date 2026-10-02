@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Printer;
 use Illuminate\Http\Request;
 use Mike42\Escpos\PrintConnectors\DummyPrintConnector;
+use Mike42\Escpos\PrintConnectors\WindowsPrintConnector;
 use Mike42\Escpos\Printer as EscPrinter;
 
 class PrinterController extends Controller
@@ -22,8 +23,9 @@ class PrinterController extends Controller
             'ip_address' => 'required_if:connection_type,network|nullable|ip',
             'port' => 'required_if:connection_type,network|nullable|integer',
             'usb_printer_name' => 'required_if:connection_type,usb|nullable|string',
-            'bluetooth_service_uuid' => 'required_if:connection_type,bluetooth|nullable|string',
-            'bluetooth_characteristic_uuid' => 'required_if:connection_type,bluetooth|nullable|string',
+            'bluetooth_service_uuid' => 'nullable|string',
+            'bluetooth_characteristic_uuid' => 'nullable|string',
+            'bluetooth_com_port' => 'nullable|string|max:20',
             'is_default' => 'boolean',
         ]);
 
@@ -44,8 +46,9 @@ class PrinterController extends Controller
             'ip_address' => 'required_if:connection_type,network|nullable|ip',
             'port' => 'required_if:connection_type,network|nullable|integer',
             'usb_printer_name' => 'required_if:connection_type,usb|nullable|string',
-            'bluetooth_service_uuid' => 'required_if:connection_type,bluetooth|nullable|string',
-            'bluetooth_characteristic_uuid' => 'required_if:connection_type,bluetooth|nullable|string',
+            'bluetooth_service_uuid' => 'nullable|string',
+            'bluetooth_characteristic_uuid' => 'nullable|string',
+            'bluetooth_com_port' => 'nullable|string|max:20',
             'is_active' => 'boolean',
             'is_default' => 'boolean',
         ]);
@@ -70,15 +73,18 @@ class PrinterController extends Controller
      * Build the ESC/POS byte stream for a receipt.
      * Used by both standalone print and auto-print-after-confirm.
      *
+     * $cols = characters per line: 32 for 58mm paper, 48 for 80mm paper.
+     *
      * Mirrors the on-screen receipt (renderReceipt() in pos.js) line
      * for line: header, store sub, date, customer, contact, type,
      * address (Delivery only), notes (if present), payment (status),
      * items, total, footer.
      */
-    public function buildReceiptBytes(array $order): string
+    public function buildReceiptBytes(array $order, int $cols = 32): string
     {
         $connector = new DummyPrintConnector();
         $printer = new EscPrinter($connector);
+        $line = str_repeat('-', $cols);
 
         // ---- Header ----
         $printer->setJustification(EscPrinter::JUSTIFY_CENTER);
@@ -102,7 +108,7 @@ class PrinterController extends Controller
         if (!empty($order['order_type'])) {
             $printer->text("Type: {$order['order_type']}\n");
         }
-        if ($order['order_type'] === 'Delivery' && !empty($order['address'])) {
+        if (($order['order_type'] ?? null) === 'Delivery' && !empty($order['address'])) {
             $printer->text("Address: {$order['address']}\n");
         }
         if (!empty($order['notes'])) {
@@ -119,7 +125,7 @@ class PrinterController extends Controller
             $printer->text("Payment Status: {$order['payment_status']}\n");
         }
 
-        $printer->text("--------------------------------\n");
+        $printer->text($line . "\n");
 
         // ---- Items ----
         foreach ($order['items'] as $item) {
@@ -132,14 +138,14 @@ class PrinterController extends Controller
             if (isset($item['price'])) {
                 $lineTotal = $item['qty'] * $item['price'];
                 $printer->text(sprintf(
-                    "%-20s %11s\n",
+                    "%-" . ($cols - 12) . "s %11s\n",
                     '@ ' . number_format($item['price'], 2),
                     number_format($lineTotal, 2)
                 ));
             }
         }
 
-        $printer->text("--------------------------------\n");
+        $printer->text($line . "\n");
 
         // ---- Total (optional — only when the caller sent one) ----
         if (isset($order['total']) && $order['total'] !== null) {
@@ -148,7 +154,7 @@ class PrinterController extends Controller
             $printer->text("TOTAL: " . number_format($order['total'], 2) . "\n");
             $printer->setEmphasis(false);
 
-            $printer->text("--------------------------------\n");
+            $printer->text($line . "\n");
         }
 
         // ---- Footer ----
@@ -178,31 +184,60 @@ class PrinterController extends Controller
             'total' => 'nullable|numeric',
         ]);
 
+        // Specific printer -> default active printer -> any active printer
         $printer = $request->printer_id
             ? Printer::findOrFail($request->printer_id)
-            : Printer::active()->default()->first();
+            : (Printer::active()->default()->first() ?? Printer::active()->first());
 
         if (!$printer) {
             return response()->json(['status' => 'error', 'message' => 'No printer configured.'], 422);
         }
 
-        $rawBytes = $this->buildReceiptBytes($request->all());
+        // 58mm Bluetooth printers = 32 cols, 80mm (XP-80) = 48 cols
+        $cols = $printer->connection_type === 'bluetooth' ? 32 : 48;
+        $rawBytes = $this->buildReceiptBytes($request->all(), $cols);
 
+        // ---- Network (LAN) printer: raw socket to ip:9100 ----
         if ($printer->connection_type === 'network') {
-            $socket = @fsockopen($printer->ip_address, $printer->port, $errno, $errstr, 5);
+            $socket = @fsockopen($printer->ip_address, (int) $printer->port, $errno, $errstr, 5);
 
             if (!$socket) {
-                return response()->json(['status' => 'error', 'message' => "Could not reach printer: {$errstr}"], 500);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Could not reach printer at {$printer->ip_address}:{$printer->port} - {$errstr} (code {$errno})",
+                ], 500);
             }
 
-            fwrite($socket, $rawBytes);
+            $written = fwrite($socket, $rawBytes);
             fclose($socket);
+
+            if ($written === false || $written < strlen($rawBytes)) {
+                return response()->json(['status' => 'error', 'message' => 'Printer connection dropped while sending data.'], 500);
+            }
 
             return response()->json(['status' => 'printed']);
         }
 
-        // usb or bluetooth: server can't reach it directly,
-        // hand the bytes back to the browser to deliver locally
+        // ---- USB printer: Laravel runs on the same Windows PC, so send the
+        // bytes through the Windows shared-printer name (usb_printer_name). ----
+        if ($printer->connection_type === 'usb') {
+            try {
+                $connector = new WindowsPrintConnector($printer->usb_printer_name);
+                $connector->write($rawBytes);
+                $connector->finalize();
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "USB print failed for '{$printer->usb_printer_name}': " . $e->getMessage()
+                        . ' (is the printer shared in Windows with that exact share name?)',
+                ], 500);
+            }
+
+            return response()->json(['status' => 'printed']);
+        }
+
+        // bluetooth: server can't reach it directly,
+        // hand the bytes back to the browser to deliver over Web Serial
         return response()->json([
             'status' => 'ready_for_client_print',
             'connection_type' => $printer->connection_type,

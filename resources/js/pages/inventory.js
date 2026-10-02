@@ -3,7 +3,9 @@
 // ============================================================
 
 import { fuzzySearch } from '../fuzzySearch.js';
+import { toast } from './toast.js';
 
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 const LOW_STOCK_THRESHOLD = 20;
 
 const CATEGORY_ICONS = {
@@ -16,15 +18,18 @@ const CATEGORY_ICONS = {
     Safety: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5.5 3.5 9 8 11 4.5-2 8-5.5 8-11V5l-8-3z"/></svg>',
 };
 
+// Escapes quotes too, so names like  4" Metal Box  don't break HTML attributes
 function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function mapInventoryToProducts(inventories) {
     return (inventories || []).map(inv => ({
-        // used by appendProductRow-style row identity / future edit-delete wiring
         inventoryId: inv.InventoryID,
         productId: inv.ProductID,
         name: inv.product ? inv.product.Product_Name : '(unknown product)',
@@ -40,15 +45,16 @@ function mapInventoryToProducts(inventories) {
 
 const state = {
     products: mapInventoryToProducts(window.INVENTORY_DATA && window.INVENTORY_DATA.inventories),
+    archived: null,        // loaded the first time ARCHIVED is clicked
+    view: 'active',        // 'active' | 'archived'
     category: 'all',
     search: '',
 };
 
 function fmtMoney(n) {
-    return (n === 'Variable') 
-        ? 'Variable' 
-        : 
-        '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n === 'Variable')
+        ? 'Variable'
+        : '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function stockClass(stock) {
@@ -59,7 +65,7 @@ function stockClass(stock) {
 
 function renderStats() {
     const total = state.products.length;
-    const value = state.products.reduce((sum, p) => sum + p.price * p.stock, 0);
+    const value = state.products.reduce((sum, p) => sum + (typeof p.price === 'number' ? p.price * p.stock : 0), 0);
     const low = state.products.filter(p => p.stock > 0 && p.stock < LOW_STOCK_THRESHOLD).length;
 
     document.getElementById('statTotal').textContent = total;
@@ -69,9 +75,10 @@ function renderStats() {
 }
 
 function getFiltered() {
+    const source = state.view === 'archived' ? (state.archived || []) : state.products;
     const categoryProducts = state.category === 'all'
-        ? state.products
-        : state.products.filter(product => product.category === state.category);
+        ? source
+        : source.filter(product => product.category === state.category);
 
     return fuzzySearch(categoryProducts, state.search, ['name', 'sku', 'category', 'subCategory']);
 }
@@ -81,7 +88,7 @@ function renderTable() {
     const rows = getFiltered();
 
     if (!rows.length) {
-        body.innerHTML = `<tr class="empty-row"><td colspan="7">No products match your search.</td></tr>`;
+        body.innerHTML = `<tr class="empty-row"><td colspan="7">${state.view === 'archived' ? 'No archived products.' : 'No products match your search.'}</td></tr>`;
         return;
     }
 
@@ -100,18 +107,20 @@ function renderTable() {
                 <td><span class="stock-pill ${sCls}">${p.stock}</span></td>
                 <td>
                     <div class="actions-cell">
-                        <button class="btn-edit"
-                            data-inventory-id="${p.inventoryId}"
-                            data-product-id="${p.productId}"
-                            data-name="${escapeHtml(p.name)}"
-                            data-sku="${escapeHtml(p.sku)}"
-                            data-category="${escapeHtml(p.category)}"
-                            data-subcategory="${escapeHtml(p.subCategory)}"
-                            data-price="${p.price}"
-                            data-stock="${p.stock}"
-                            data-reorder-level="${p.reorderLevel}"
-                        >EDIT</button>
-                        <button class="btn-del" data-inventory-id="${p.inventoryId}">DEL</button>
+                        ${state.view === 'archived'
+                            ? `<button class="btn-restore" data-product-id="${p.productId}" data-name="${escapeHtml(p.name)}">RESTORE</button>`
+                            : `<button class="btn-edit"
+                                    data-inventory-id="${p.inventoryId}"
+                                    data-product-id="${p.productId}"
+                                    data-name="${escapeHtml(p.name)}"
+                                    data-sku="${escapeHtml(p.sku)}"
+                                    data-category="${escapeHtml(p.category)}"
+                                    data-subcategory="${escapeHtml(p.subCategory)}"
+                                    data-price="${p.price}"
+                                    data-stock="${p.stock}"
+                                    data-reorder-level="${p.reorderLevel}"
+                                >EDIT</button>
+                                <button class="btn-del" data-product-id="${p.productId}" data-name="${escapeHtml(p.name)}">ARCHIVE</button>`}
                     </div>
                 </td>
             </tr>`;
@@ -121,6 +130,23 @@ function renderTable() {
 function render() {
     renderStats();
     renderTable();
+}
+
+function updateViewUi() {
+    const archBtn = document.getElementById('archivedBtn');
+    const addBtn = document.getElementById('addProductBtn');
+    const archived = state.view === 'archived';
+
+    if (archBtn) {
+        archBtn.textContent = archived ? '← BACK TO ACTIVE' : 'ARCHIVED';
+        archBtn.classList.toggle('active', archived);
+    }
+    if (addBtn) addBtn.style.display = archived ? 'none' : '';
+
+    const n = state.archived ? state.archived.length : 0;
+    document.getElementById('headerSub').textContent = archived
+        ? `${n} archived product${n === 1 ? '' : 's'}`
+        : `${state.products.length} product${state.products.length === 1 ? '' : 's'} registered`;
 }
 
 function bindEvents() {
@@ -144,26 +170,93 @@ function bindEvents() {
         if (!tabs) return;
         const preferredOrder = Object.keys(CATEGORY_ICONS);
         const categories = Array.from(new Set(state.products.map(p => p.category))).filter(Boolean);
-        // Sort by preferredOrder first, then alphabetically
         categories.sort((a,b) => {
             const ia = preferredOrder.indexOf(a);
             const ib = preferredOrder.indexOf(b);
             if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
             return a.localeCompare(b);
         });
-
-        // Start with the ALL tab
         tabs.innerHTML = `<div class="tab active" data-cat="all">ALL</div>` + categories.map(cat => `\n<div class="tab" data-cat="${escapeHtml(cat)}">${escapeHtml(cat.toUpperCase())}</div>`).join('');
     })();
 
-    document.getElementById('productBody').addEventListener('click', (e) => {
-        const delBtn = e.target.closest('.btn-del');
-        if (delBtn) {
-            // Hook up your delete confirmation / request here.
-            console.log('Delete inventory row', delBtn.dataset.inventoryId);
+    // ARCHIVE / RESTORE buttons in the table.
+    // (EDIT clicks are handled by inventory-edit-product.js on this same container.)
+    document.getElementById('productBody').addEventListener('click', async (e) => {
+        const table = document.querySelector('.product-table');
+
+        const restoreBtn = e.target.closest('.btn-restore');
+        if (restoreBtn) {
+            restoreBtn.disabled = true;
+            try {
+                const res = await fetch(table.dataset.restoreUrlTemplate.replace('__ID__', restoreBtn.dataset.productId), {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                });
+                if (!res.ok) throw new Error('Request failed');
+
+                const idx = state.archived.findIndex(p => String(p.productId) === restoreBtn.dataset.productId);
+                if (idx !== -1) state.products.unshift(state.archived.splice(idx, 1)[0]);
+                render();
+                updateViewUi();
+                toast('Product restored.', 'success');
+            } catch (err) {
+                console.error('Restore failed:', err);
+                toast('Could not restore the product.', 'error');
+                restoreBtn.disabled = false;
+            }
+            return;
         }
-        // EDIT clicks are handled by inventory-edit-product.js, which
-        // listens on this same #productBody container.
+
+        const btn = e.target.closest('.btn-del');
+        if (!btn) return;
+
+        if (!confirm(`Archive "${btn.dataset.name}"?\n\nIt will be hidden from POS and Inventory. Past orders and reports keep it.`)) return;
+
+        btn.disabled = true;
+        try {
+            const res = await fetch(table.dataset.archiveUrlTemplate.replace('__ID__', btn.dataset.productId), {
+                method: 'PATCH',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+            });
+            if (!res.ok) throw new Error('Request failed');
+
+            state.products = state.products.filter(p => String(p.productId) !== btn.dataset.productId);
+            state.archived = null;   // reload the archived list next time it's opened
+            render();
+            toast('Product archived.', 'success');
+        } catch (err) {
+            console.error('Archive failed:', err);
+            toast('Could not archive the product.', 'error');
+            btn.disabled = false;
+        }
+    });
+
+    // ARCHIVED / BACK TO ACTIVE toggle
+    document.getElementById('archivedBtn').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+
+        if (state.view === 'archived') {
+            state.view = 'active';
+        } else {
+            btn.disabled = true;
+            try {
+                if (state.archived === null) {
+                    const res = await fetch(btn.dataset.archivedUrl, { headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) throw new Error('Request failed');
+                    state.archived = mapInventoryToProducts(await res.json());
+                }
+                state.view = 'archived';
+            } catch (err) {
+                console.error('Load archived failed:', err);
+                toast('Could not load archived products.', 'error');
+                btn.disabled = false;
+                return;
+            }
+            btn.disabled = false;
+        }
+
+        updateViewUi();
+        renderTable();
     });
 
     document.getElementById('addProductBtn').addEventListener('click', () => {

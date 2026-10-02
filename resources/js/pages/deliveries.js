@@ -4,6 +4,7 @@
 
 import { printReceipt } from './printReceipt.js';
 import '../pt210-printer.js';
+import Swal from 'sweetalert2';
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
@@ -113,6 +114,9 @@ function mapTrucks(list) {
                 truckName: t.TruckName,
                 orderLabel: 'ORD-' + (orderItem.OrderID ?? order.OrderID ?? '—'),
                 customer: order.CustomerName || 'Unknown',
+                contact: order.ContactNumber || '',
+                address: order.Address || '',
+                notes: order.Notes || '',
                 driver: mainD?.Name || '—',
                 helper: helperD?.Name || null,
                 itemName: orderItem.product?.Product_Name || 'Item',
@@ -598,7 +602,22 @@ async function openTruckModal(mode = 'create', truckId = null) {
 }
 
 async function deleteTruck(truckId) {
-    if (!window.confirm('Delete this truck? Any assigned order items will return to unresolved/pending status.')) return;
+        const truck = trucks.find(t => String(t.id) === String(truckId));
+    const confirmation = await Swal.fire({
+        title: 'Delete this truck?',
+        html: `<b>${escapeHtml(truck?.name || 'This truck')}</b> will be removed. Any assigned order items will return to unresolved/pending status.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, delete',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true,
+        focusCancel: true,
+        confirmButtonColor: '#e5484d',
+        cancelButtonColor: '#4d5265',
+        background: '#11141c',
+        color: '#e9e7df',
+    });
+    if (!confirmation.isConfirmed) return;
     try {
         const res = await fetch(`/trucks/${truckId}`, {
             method: 'DELETE',
@@ -753,7 +772,7 @@ function renderDispatchLog(){
         return;
     }
 
-    if(activeLogTab === 'deliveries'){
+        if(activeLogTab === 'deliveries'){
         list.innerHTML = dispatchLogEntries.map(e => `
             <div class="log-row">
                 <div class="log-row-top">
@@ -762,6 +781,9 @@ function renderDispatchLog(){
                 </div>
                 <div class="log-row-sub">${svg.truck} ${e.truckName} &middot; ${e.driver}${e.helper ? ' + ' + e.helper : ''}</div>
                 <div class="log-row-time">${svg.clock} ${fmtDateTime(e.timestamp)}</div>
+                <div style="margin-top:8px;">
+                    <button class="btn-ghost" type="button" onclick="viewDeliveryDetails(${e.dispatchId})">${svg.eye} DETAILS</button>
+                </div>
             </div>`).join('');
     } else {
         list.innerHTML = dispatchLogEntries.map(e => `
@@ -772,6 +794,9 @@ function renderDispatchLog(){
                 </div>
                 <div class="log-row-sub">${e.orderLabel} &middot; ${e.customer} &middot; ${e.truckName}</div>
                 <div class="log-row-time">${svg.clock} ${fmtDateTime(e.timestamp)}</div>
+                <div style="margin-top:8px;">
+                    <button class="btn-ghost" type="button" onclick="viewDeliveryDetails(${e.dispatchId})">${svg.eye} DETAILS</button>
+                </div>
             </div>`).join('');
     }
 }
@@ -1044,7 +1069,21 @@ function clearTruck(truckId){
  * (backend status 'Pending'). Releases the item back to the unassigned pool.
  */
 async function cancelPendingDispatch(dispatchId){
-    if(!confirm('Cancel this dispatch? The item will return to the pending pool.')) return;
+        const confirmation = await Swal.fire({
+        title: 'Cancel this dispatch?',
+        text: 'The item will return to the pending pool.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, cancel dispatch',
+        cancelButtonText: 'Keep it',
+        reverseButtons: true,
+        focusCancel: true,
+        confirmButtonColor: '#e5484d',
+        cancelButtonColor: '#4d5265',
+        background: '#11141c',
+        color: '#e9e7df',
+    });
+    if (!confirmation.isConfirmed) return;
     try {
         const res = await fetch(`/dispatches/${dispatchId}/cancel`, {
             method: 'POST',
@@ -1285,7 +1324,21 @@ async function markReturned(truckId){
         alert('This truck has no accepted deliveries to mark as failed.');
         return;
     }
-    if(!confirm(`Mark ${truck.name}'s delivery as failed? All items will return to the pending pool.`)) return;
+        const confirmation = await Swal.fire({
+        title: 'Mark delivery as failed?',
+        html: `All items on <b>${escapeHtml(truck.name)}</b> will return to the pending pool for re-delivery.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, mark as failed',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true,
+        focusCancel: true,
+        confirmButtonColor: '#e5484d',
+        cancelButtonColor: '#4d5265',
+        background: '#11141c',
+        color: '#e9e7df',
+    });
+    if (!confirmation.isConfirmed) return;
 
     try {
         for (const dispatchId of truck.activeDispatchIds) {
@@ -1359,6 +1412,93 @@ async function viewDispatchLog(truckId){
         console.error('Failed to load dispatch log:', err);
         overlay.querySelector('#dlBody').textContent = 'Could not load the dispatch log.';
     }
+}
+
+/**
+ * Full details for one dispatch: order/customer info, driver, quantities,
+ * delivery result, and the complete activity timeline.
+ */
+async function viewDeliveryDetails(dispatchId){
+    const entry = dispatchLogEntries.find(e => String(e.dispatchId) === String(dispatchId));
+    if(!entry) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'doa-modal-overlay';
+    overlay.innerHTML = `
+        <div class="doa-modal-box doa-delivery-modal" role="dialog" aria-modal="true">
+            <div class="doa-modal-head">
+                <div>DELIVERY DETAILS &middot; ${escapeHtml(entry.orderLabel)}</div>
+                <button class="doa-modal-x" type="button" id="ddClose" aria-label="Close">${svg.x}</button>
+            </div>
+            <div id="ddBody" class="doa-modal-sub">Loading&hellip;</div>
+        </div>`;
+    document.body.appendChild(overlay);
+    injectAssignModalStyles();
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#ddClose').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+    // Fields we already have from the log entry
+    let detail = null;
+    try {
+        const res = await fetch(`/dispatches/${dispatchId}`, { headers: { 'Accept': 'application/json' } });
+        if (res.ok) detail = await res.json();
+    } catch (err) {
+        console.error('Failed to load dispatch details:', err);
+    }
+
+    const delivery = detail?.delivery || (Array.isArray(detail?.deliveries) ? detail.deliveries[0] : null) || null;
+    const deliveredQty = delivery && delivery.QuantityDelivered !== undefined && delivery.QuantityDelivered !== null
+        ? Number(delivery.QuantityDelivered)
+        : null;
+    const deliveredAt = delivery?.DeliveredAt || delivery?.DeliveryDate || delivery?.created_at || null;
+    const shortfall = deliveredQty !== null ? Math.max(0, entry.qty - deliveredQty) : null;
+
+    const field = (label, value) =>
+        `<div><b>${label}</b><span>${escapeHtml(value === null || value === undefined || value === '' ? '—' : value)}</span></div>`;
+
+    const logs = (detail?.logs || []).map(l => `
+        <div class="doa-log-row">
+            <span class="doa-log-action">${escapeHtml(l.Action)}</span>
+            <span class="doa-log-notes">${escapeHtml(l.Notes || '')}</span>
+            <span class="doa-log-time">${fmtDateTime(l.LoggedAt)}</span>
+        </div>`).join('') || '<div class="doa-log-row"><span class="doa-log-notes">No activity recorded.</span></div>';
+
+    overlay.querySelector('#ddBody').outerHTML = `
+        <div class="doa-delivery-truck-status">STATUS <b>${escapeHtml((entry.status || '').toUpperCase())}</b></div>
+
+        <section class="doa-delivery-group">
+            <div class="doa-delivery-order">${escapeHtml(entry.orderLabel)}</div>
+            <div class="doa-delivery-fields">
+                ${field('CUSTOMER', entry.customer)}
+                ${field('CONTACT', entry.contact)}
+                ${field('ADDRESS', entry.address)}
+                ${field('ORDER NOTES', entry.notes)}
+                ${field('TRUCK', entry.truckName)}
+                ${field('DRIVER', entry.driver)}
+                ${field('HELPER', entry.helper)}
+                ${field('DISPATCHED / ACCEPTED', fmtDateTime(entry.timestamp))}
+            </div>
+        </section>
+
+        <section class="doa-delivery-group" style="margin-top:10px;">
+            <div class="doa-delivery-order">ITEM</div>
+            <div class="doa-delivery-fields">
+                ${field('PRODUCT', entry.itemName)}
+                ${field('QTY DISPATCHED', entry.qty)}
+                ${field('QTY DELIVERED', deliveredQty)}
+                ${field('NOT DELIVERED', shortfall)}
+                ${field('DELIVERED AT', deliveredAt ? fmtDateTime(deliveredAt) : null)}
+                ${field('DELIVERY NOTES', delivery?.Notes)}
+            </div>
+        </section>
+
+        <section class="doa-delivery-group" style="margin-top:10px;">
+            <div class="doa-delivery-order">ACTIVITY</div>
+            ${logs}
+        </section>`;
 }
 
 /* ----------------------------------------------------------
@@ -1494,6 +1634,7 @@ window.viewDispatchLog = viewDispatchLog;
 window.showTruckDetails = showTruckDetails;
 window.openTruckModal = openTruckModal;
 window.deleteTruck = deleteTruck;
+window.viewDeliveryDetails = viewDeliveryDetails;
 
 // Works alongside the existing HTML5 drag-and-drop in deliveries.js.
 // It does NOT handle drops – it only (1) marks the page as "dragging"

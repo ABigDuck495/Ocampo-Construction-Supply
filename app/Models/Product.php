@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
+
     protected $table = 'products';
     protected $primaryKey = 'ProductID';
 
@@ -55,4 +57,8 @@ class Product extends Model
     {
         return isset($this->attributes['Pricing_type']) && $this->attributes['Pricing_type'] === 'Variable';
     }
+
+    use SoftDeletes;
+    const DELETED_AT = 'archived_at';
+    
 }

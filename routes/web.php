@@ -109,6 +109,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports/summary', [ReportController::class, 'summary']);
         Route::get('/reports/export/pdf', [ReportController::class, 'exportPdf']);
         Route::get('/reports/export/csv', [ReportController::class, 'exportCsv']);
+        Route::patch('/products/{id}/archive', [ProductController::class, 'archive'])->name('products.archive');
+        Route::get('/inventory/archived', [InventoryController::class, 'archived'])->name('inventory.archived');
+        Route::patch('/products/{id}/restore', [ProductController::class, 'restore'])->name('products.restore');
  
     Route::middleware(['role:Admin'])->group(function () {
         Route::resource('users', UserController::class);

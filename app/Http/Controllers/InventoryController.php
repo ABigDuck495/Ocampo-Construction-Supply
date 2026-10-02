@@ -16,19 +16,21 @@ class InventoryController extends Controller
     {
         return Inventory::query()
             ->with('product')
+            ->whereHas('product')
             ->latest('InventoryID')
             ->get();
     }
 
 
-    public function page()
+   public function page()
     {
         $inventories = Inventory::with('product')
+            ->whereHas('product')          // skips rows whose product is archived
             ->latest('InventoryID')
             ->get();
 
-        $lowStockCount = Inventory::lowStock()->count();
-        $outOfStockCount = Inventory::outOfStock()->count();
+        $lowStockCount = Inventory::lowStock()->whereHas('product')->count();
+        $outOfStockCount = Inventory::outOfStock()->whereHas('product')->count();
 
         return view('inventory.index', [
             'inventories'     => $inventories,
@@ -229,11 +231,11 @@ class InventoryController extends Controller
         return $inventory->fresh();
     }
     public function lowStock(){
-        return Inventory::lowStock()->with('product')->get();
+        return Inventory::lowStock()->whereHas('product')->with('product')->get();
     }
 
     public function outOfStock(){
-        return Inventory::outOfStock()->with('product')->get();
+        return Inventory::outOfStock()->whereHas('product')->with('product')->get();
     }
     public function checkAvailability(Request $request)
     {
@@ -255,5 +257,14 @@ class InventoryController extends Controller
             ];
         }
         return $results;
+    }
+
+    public function archived()
+    {
+        return Inventory::query()
+            ->with(['product' => fn ($q) => $q->onlyTrashed()])
+            ->whereHas('product', fn ($q) => $q->onlyTrashed())
+            ->latest('InventoryID')
+            ->get();
     }
 }

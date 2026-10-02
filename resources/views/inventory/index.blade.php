@@ -45,7 +45,10 @@
                     <div class="hstat value"><b id="statValue">₱0.00</b><span>STOCK VALUE</span></div>
                     <div class="hstat low"><b id="statLow">0</b><span>LOW STOCK</span></div>
                 </div>
-                <button class="add-product-btn" id="addProductBtn" type="button">+ ADD PRODUCT</button>
+                <div class="header-actions">
+                    <button class="add-product-btn arcwwwhive-view-btn" id="archivedBtn" type="button" data-archived-url="{{ route('inventory.archived') }}">ARCHIVED</button>
+                    <button class="add-product-btn" id="addProductBtn" type="button">+ ADD PRODUCT</button>
+                </div>
             </div>
 
             <div class="search-bar">
@@ -89,7 +92,9 @@
             </div>
         </div>
 
-        <table class="product-table">
+        <table class="product-table"
+            data-archive-url-template="{{ route('products.archive', ['id' => '__ID__']) }}"
+            data-restore-url-template="{{ route('products.restore', ['id' => '__ID__']) }}">
             <thead>
                 <tr>
                     <th class="col-product">PRODUCT</th>
