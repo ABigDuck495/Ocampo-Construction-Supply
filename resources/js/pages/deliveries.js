@@ -47,7 +47,9 @@ function groupOrderItems(items) {
         const product = oi.product || {};
         map[groupKey].items.push({
             name: product.Product_Name || 'Item',
-            qty: oi.Quantity,
+            // Remaining to deliver (Quantity minus what's already dispatched /
+            // delivered); a Partial delivery's shortfall shows up here.
+            qty: oi.quantity_remaining ?? oi.Quantity,
             orderItemId: oi.OrderItemID,
         });
         map[groupKey].orderItemIds.push(oi.OrderItemID);

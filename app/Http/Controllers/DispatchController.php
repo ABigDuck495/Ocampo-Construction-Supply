@@ -15,8 +15,9 @@ class DispatchController extends Controller
 {
     public function index(){
         $orders = OrderItem::awaitingDispatch()
-            ->with('product', 'order.transactions')
-            ->get();
+            ->with('product', 'order.transactions', 'dispatches.delivery')
+            ->get()
+            ->each(fn ($item) => $item->append('quantity_remaining')->makeHidden('dispatches'));
         $trucks = Truck::with('dispatches.orderItem.order', 'dispatches.orderItem.product', 'dispatches.drivers')->get();
 
         return view('deliveries.index', compact('orders', 'trucks'));
@@ -152,8 +153,9 @@ class DispatchController extends Controller
     public function unassignedItems()
     {
         return OrderItem::awaitingDispatch()
-            ->with('product', 'order')
-            ->get();
+            ->with('product', 'order', 'dispatches.delivery')
+            ->get()
+            ->each(fn ($item) => $item->append('quantity_remaining')->makeHidden('dispatches'));
     }
 
     /**

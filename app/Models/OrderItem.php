@@ -66,9 +66,11 @@ class OrderItem extends Model
 
     public function scopeAwaitingDispatch($query)
     {
+        // A 'Partial' dispatch only claims what was actually delivered; the
+        // shortfall goes back into the pool so it can be dispatched again.
         return $query->whereRaw(
-            'CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(QuantityDispatched), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID AND dispatches.Status != ?)',
-            ['Failed']
+            'CAST(Quantity AS DECIMAL(10,2)) > (SELECT COALESCE(SUM(CASE WHEN dispatches.Status = ? THEN COALESCE((SELECT SUM(deliveries.QuantityDelivered) FROM deliveries WHERE deliveries.DispatchID = dispatches.DispatchID), 0) ELSE dispatches.QuantityDispatched END), 0) FROM dispatches WHERE dispatches.OrderItemID = order_items.OrderItemID AND dispatches.Status != ?)',
+            ['Partial', 'Failed']
         );
     }
 
@@ -94,18 +96,44 @@ class OrderItem extends Model
     }
 
     /**
-     * Sum of QuantityDispatched across dispatches still "claiming" stock —
-     * i.e. everything except Failed/cancelled ones, since those release
-     * their quantity back into the pending pool.
+     * Sum of quantity across dispatches still "claiming" stock — everything
+     * except Failed/cancelled ones, since those release their quantity back
+     * into the pending pool. A 'Partial' dispatch only claims the quantity
+     * that was actually delivered; the shortfall is released back too.
      */
     public function quantityDispatched() {
-        return $this->relationLoaded('dispatches')
-            ? $this->dispatches->where('Status', '!=', 'Failed')->sum('QuantityDispatched')
-            : $this->dispatches()->where('Status', '!=', 'Failed')->sum('QuantityDispatched');
+        $dispatches = $this->relationLoaded('dispatches')
+            ? $this->dispatches
+            : $this->dispatches()->with('delivery')->get();
+
+        return $dispatches
+            ->where('Status', '!=', 'Failed')
+            ->sum(function ($dispatch) {
+                if ($dispatch->Status === 'Partial') {
+                    return (float) ($dispatch->delivery?->QuantityDelivered ?? 0);
+                }
+
+                return (float) $dispatch->QuantityDispatched;
+            });
     }
 
     public function quantityRemaining() {
         return (float) $this->Quantity - $this->quantityDispatched();
+    }
+
+    /**
+     * Accessors so these values can be included when the model is turned
+     * into an array/JSON (for example through $appends or ->append()).
+     * They just call the existing methods above.
+     */
+    public function getQuantityRemainingAttribute()
+    {
+        return $this->quantityRemaining();
+    }
+
+    public function getQuantityDispatchedAttribute()
+    {
+        return $this->quantityDispatched();
     }
 
     public function recalculateStatus(): void

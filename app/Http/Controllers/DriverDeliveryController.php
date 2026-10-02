@@ -112,17 +112,21 @@ class DriverDeliveryController extends Controller
         $group = $this->groupFor($dispatch, $driverId);
 
         return DB::transaction(function () use ($group, $dispatch) {
+            // One shared timestamp for the whole truckload, so the receipt can
+            // later tell which dispatches left together.
+            $acceptedAt = now();
+
             foreach ($group as $d) {
                 $d->update([
                     'Status' => 'On Route',
-                    'AcceptedAt' => now(),
+                    'AcceptedAt' => $acceptedAt,
                 ]);
 
                 DispatchLog::create([
                     'DispatchID' => $d->DispatchID,
                     'Action' => 'Accepted',
                     'Notes' => 'Driver accepted and departed.',
-                    'LoggedAt' => now(),
+                    'LoggedAt' => $acceptedAt,
                 ]);
             }
 
@@ -200,7 +204,9 @@ class DriverDeliveryController extends Controller
         $notes = $validated['Notes'] ?? 'Delivered by driver through the mobile app.';
 
         // All-or-nothing: if any dispatch in the group fails, none are marked.
-        DB::transaction(function () use ($group, $quantities, $notes) {
+        $outcomes = DB::transaction(function () use ($group, $quantities, $notes) {
+            $outcomes = [];
+
             foreach ($group as $d) {
                 if ($d->delivery()->exists()) {
                     continue;
@@ -214,8 +220,9 @@ class DriverDeliveryController extends Controller
                     ?? (int) round((float) $d->QuantityDispatched);
 
                 // Use the existing DeliveryController so all existing delivery
-                // business rules are applied consistently (this also handles
-                // partial deliveries / pasabay automatically).
+                // business rules are applied consistently. It decides whether
+                // this line is Delivered, Partial (short quantity) or Failed
+                // (nothing delivered) from the quantity submitted.
                 $deliveryRequest = Request::create(
                     "/api/driver/deliveries/{$d->DispatchID}/deliver",
                     'POST',
@@ -228,17 +235,29 @@ class DriverDeliveryController extends Controller
 
                 app(DeliveryController::class)->store($deliveryRequest, $d);
 
+                $outcomes[] = $d->fresh()->Status;
+
                 $order = $d->orderItem?->order;
                 if ($order) {
                     $order->update(['PaymentStatus' => 'Paid']);
                 }
             }
+
+            return $outcomes;
         });
 
+        $status = $this->overallStatus($outcomes);
+
+        $message = match ($status) {
+            'Partial' => 'Delivery marked as partial. The undelivered items were returned to the pending pool.',
+            'Failed' => 'Nothing was delivered. All items were returned to the pending pool.',
+            default => 'Delivery marked as delivered.',
+        };
+
         return response()->json([
-            'message' => 'Delivery marked as delivered.',
+            'message' => $message,
             'dispatch_id' => $dispatch->DispatchID,
-            'status' => 'Delivered',
+            'status' => $status,
         ]);
     }
 
@@ -266,7 +285,7 @@ class DriverDeliveryController extends Controller
 
         // Every dispatch under the same order (any truck/driver), excluding
         // failed/cancelled ones, so the receipt shows the real manifest.
-        $orderDispatches = Dispatch::with(['orderItem.product'])
+        $orderDispatches = Dispatch::with(['orderItem.product', 'delivery'])
             ->where('Status', '!=', 'Failed')
             ->whereHas('orderItem', fn ($q) => $q->where('OrderID', $order->OrderID))
             ->get();
@@ -279,10 +298,34 @@ class DriverDeliveryController extends Controller
                 return [
                     'product_name' => $product->Product_Name,
                     'unit' => $product->Unit,
-                    'quantity' => $group->sum('QuantityDispatched'),
+                    // A Partial dispatch shows what was actually delivered.
+                    'quantity' => $group->sum(fn ($d) => $d->Status === 'Partial'
+                        ? (float) ($d->delivery?->QuantityDelivered ?? 0)
+                        : (float) $d->QuantityDispatched),
                 ];
             })
             ->values();
+
+        // While this truckload is still open (Pending / On Route), "Items
+        // Loaded" must show only what is on THIS truck, using the quantity
+        // dispatched for it. Otherwise a re-dispatched shortfall (e.g. 1 pipe)
+        // gets added to the earlier partial delivery (16) and shows 17, and
+        // items from earlier truckloads show up too. Once the delivery is
+        // resolved, the full order manifest above is used.
+        if (in_array($dispatch->Status, ['Pending', 'On Route'], true)) {
+            $items = $this->groupFor($dispatch, $driverId)
+                ->filter(fn ($d) => $d->orderItem && $d->orderItem->product)
+                ->groupBy('OrderItemID')
+                ->map(function ($g) {
+                    $product = $g->first()->orderItem->product;
+                    return [
+                        'product_name' => $product->Product_Name,
+                        'unit' => $product->Unit,
+                        'quantity' => $g->sum(fn ($d) => (float) $d->QuantityDispatched),
+                    ];
+                })
+                ->values();
+        }
 
         $crew = $dispatch->drivers->map(fn ($d) => [
             'driver_id' => $d->DriverID,
@@ -316,7 +359,7 @@ class DriverDeliveryController extends Controller
             'receipt' => [
                 'dispatch_id' => $dispatch->DispatchID,
                 'order_id' => $order->OrderID,
-                'dispatch_status' => $dispatch->Status,
+                'dispatch_status' => $this->receiptStatus($dispatch, $order->OrderID),
                 'delivered_at' => optional($deliveredAt)->toIso8601String(),
                 'truck_name' => $dispatch->truck?->TruckName,
                 'plate_number' => $dispatch->truck?->PlateNumber,
@@ -327,6 +370,49 @@ class DriverDeliveryController extends Controller
                 'pending_items' => $pendingItems,
             ],
         ]);
+    }
+
+    /**
+     * Collapses the per-line outcomes of one truckload into the status shown
+     * on the receipt: all Delivered -> Delivered, all Failed -> Failed,
+     * anything mixed or short -> Partial.
+     */
+    private function overallStatus(array $statuses): string
+    {
+        $statuses = array_values(array_unique($statuses));
+
+        if ($statuses === ['Delivered']) {
+            return 'Delivered';
+        }
+
+        if ($statuses === ['Failed']) {
+            return 'Failed';
+        }
+
+        return 'Partial';
+    }
+
+    /**
+     * Receipt status for a dispatch. Once resolved, the dispatches that
+     * left together (same order, truck and AcceptedAt) are judged as one
+     * truckload, so a short line marks the whole receipt "Partial".
+     */
+    private function receiptStatus(Dispatch $dispatch, $orderId): string
+    {
+        $resolved = ['Delivered', 'Partial', 'Failed'];
+
+        if (!in_array($dispatch->Status, $resolved, true) || !$dispatch->AcceptedAt) {
+            return $dispatch->Status;
+        }
+
+        $statuses = Dispatch::where('TruckID', $dispatch->TruckID)
+            ->where('AcceptedAt', $dispatch->AcceptedAt)
+            ->whereIn('Status', $resolved)
+            ->whereHas('orderItem', fn ($q) => $q->where('OrderID', $orderId))
+            ->pluck('Status')
+            ->all();
+
+        return $this->overallStatus($statuses ?: [$dispatch->Status]);
     }
 
     private function isAssignedToDriver(Dispatch $dispatch, $driverId): bool
