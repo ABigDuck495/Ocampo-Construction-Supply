@@ -161,7 +161,7 @@ class PrinterController extends Controller
         $printer->setJustification(EscPrinter::JUSTIFY_CENTER);
         $printer->text(($order['footer'] ?? 'Thank you for your purchase!') . "\n");
 
-        $printer->feed(2);
+        $printer->feed(9);
         $printer->cut();
 
         $data = $connector->getData();

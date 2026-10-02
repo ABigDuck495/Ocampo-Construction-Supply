@@ -9,7 +9,6 @@
             <button type="button" class="ps-filter active" data-filter="all">ALL</button>
             <button type="button" class="ps-filter" data-filter="Paid">PAID</button>
             <button type="button" class="ps-filter" data-filter="Payable">PAYABLE</button>
-            <button type="button" class="ps-filter" data-filter="Unpaid">UNPAID</button>
         </div>
     </div>
 
